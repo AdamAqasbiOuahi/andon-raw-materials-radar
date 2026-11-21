@@ -1,0 +1,2829 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ANDON · Radar Matières Premières</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.mini.min.js"></script>
+<style>
+:root{
+  --bg:#10131a;
+  --bg-grid: #171b23;
+  --panel:#181c25;
+  --panel-alt:#1f242e;
+  --panel-raised:#242a35;
+  --border:#2b313d;
+  --border-soft:#232833;
+  --text:#e9ebef;
+  --text-dim:#9aa4b2;
+  --text-faint:#5c6572;
+  --red:#f0503f;
+  --red-tint:rgba(240,80,63,0.14);
+  --amber:#f2a93b;
+  --amber-tint:rgba(242,169,59,0.14);
+  --violet:#a78bfa;
+  --violet-tint:rgba(167,139,250,0.14);
+  --blue:#4c9fe8;
+  --blue-tint:rgba(76,159,232,0.14);
+  --green:#3ad48a;
+  --green-tint:rgba(58,212,138,0.14);
+  --gray:#6b7480;
+  --gray-tint:rgba(107,116,128,0.12);
+  --font-head:'IBM Plex Sans Condensed',sans-serif;
+  --font-mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    linear-gradient(var(--bg-grid) 1px, transparent 1px) 0 0/100% 42px,
+    var(--bg);
+  color:var(--text);
+  font-family:var(--font-mono);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+@media (prefers-reduced-motion: reduce){ *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;} }
+h1,h2,h3,h4{font-family:var(--font-head); font-weight:600; margin:0; letter-spacing:0.01em;}
+button{font-family:var(--font-mono); cursor:pointer; color:inherit;}
+input,select{font-family:var(--font-mono);}
+::-webkit-scrollbar{width:10px; height:10px;}
+::-webkit-scrollbar-track{background:var(--panel);}
+::-webkit-scrollbar-thumb{background:var(--border); border-radius:6px;}
+
+#app{min-height:100vh; display:flex; flex-direction:column;}
+
+/* ---------- shared bits ---------- */
+.eyebrow{
+  font-family:var(--font-head); text-transform:uppercase; letter-spacing:0.16em;
+  font-size:11px; color:var(--text-faint); font-weight:600;
+}
+.badge{
+  display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:3px;
+  font-size:11px; font-weight:600; font-family:var(--font-head); letter-spacing:0.03em; white-space:nowrap;
+}
+.dot{width:7px; height:7px; border-radius:50%; flex:none;}
+.btn{
+  background:var(--panel-raised); color:var(--text); border:1px solid var(--border);
+  padding:10px 18px; border-radius:4px; font-size:13px; font-weight:600; font-family:var(--font-head);
+  letter-spacing:0.04em; text-transform:uppercase; transition:all .15s;
+}
+.btn:hover{border-color:var(--text-dim); background:#2a303c;}
+.btn.primary{background:var(--amber); color:#1a1305; border-color:var(--amber);}
+.btn.primary:hover{background:#f7bb5c;}
+.btn.primary:disabled{background:var(--panel-raised); color:var(--text-faint); border-color:var(--border); cursor:not-allowed;}
+.btn.ghost{background:transparent;}
+
+/* ================= SCREEN: UPLOAD ================= */
+.screen-center{flex:1; display:flex; align-items:center; justify-content:center; padding:32px;}
+.upload-card{width:100%; max-width:720px;}
+.brand-row{display:flex; align-items:center; gap:14px; margin-bottom:6px;}
+.brand-mark{
+  width:38px; height:38px; border-radius:6px; background:var(--amber);
+  display:flex; align-items:center; justify-content:center; flex:none;
+  box-shadow:0 0 22px rgba(242,169,59,0.35);
+}
+.brand-mark svg{width:20px; height:20px;}
+.brand-name{font-family:var(--font-head); font-size:26px; font-weight:700; letter-spacing:0.05em;}
+.brand-sub{color:var(--text-dim); font-size:13.5px; margin-top:2px;}
+.upload-intro{color:var(--text-dim); font-size:13.5px; line-height:1.6; margin:22px 0 26px; max-width:560px;}
+
+.dropzone{
+  border:2px dashed var(--border); border-radius:8px; padding:40px 24px; text-align:center;
+  background:var(--panel); transition:all .15s; position:relative;
+}
+.dropzone.drag{border-color:var(--amber); background:var(--panel-alt);}
+.dropzone .dz-icon{width:34px; height:34px; margin:0 auto 14px; color:var(--text-faint);}
+.dropzone .dz-title{font-family:var(--font-head); font-size:15px; font-weight:600;}
+.dropzone .dz-sub{color:var(--text-faint); font-size:12px; margin-top:6px;}
+.dropzone input{position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%;}
+
+.filechecks{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:20px;}
+.filecheck{
+  border:1px solid var(--border); border-radius:6px; padding:12px 12px; background:var(--panel);
+  display:flex; flex-direction:column; gap:6px; min-height:74px;
+}
+.filecheck.ok{border-color:rgba(58,212,138,0.4); background:var(--green-tint);}
+.filecheck.err{border-color:rgba(240,80,63,0.45); background:var(--red-tint);}
+.filecheck .fc-top{display:flex; align-items:center; gap:7px; font-family:var(--font-head); font-weight:600; font-size:12.5px;}
+.filecheck .fc-name{color:var(--text-faint); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.status-icon{width:15px; height:15px; flex:none;}
+
+.upload-error{
+  margin-top:14px; padding:10px 12px; border:1px solid rgba(240,80,63,0.4); background:var(--red-tint);
+  border-radius:6px; font-size:12.5px; color:#ffb3ab;
+}
+.upload-actions{display:flex; justify-content:flex-end; margin-top:24px; gap:10px;}
+.demo-box{
+  display:flex; align-items:center; flex-wrap:wrap; gap:14px 18px; margin-top:26px; padding-top:20px; border-top:1px solid var(--border);
+}
+.demo-box .demo-text{flex:1 1 260px; min-width:0;}
+.demo-box .demo-title{font-family:var(--font-head); font-weight:600; font-size:13.5px;}
+.demo-box .demo-note{color:var(--text-faint); font-size:11.5px; line-height:1.55; margin-top:4px;}
+.demo-box .btn{flex:none; white-space:nowrap;}
+.demo-line{color:var(--text-faint); font-size:11.5px; line-height:1.55; margin-top:10px;}
+.tb-badge{
+  margin-left:12px; padding:3px 9px; border-radius:999px; font-size:10.5px; font-weight:600; letter-spacing:0.03em;
+  white-space:nowrap; cursor:help;
+}
+.tb-badge.demo{color:var(--amber); background:var(--amber-tint); border:1px solid rgba(242,169,59,0.4);}
+.tb-badge.stale{color:var(--text-dim); border:1px solid var(--border);}
+
+/* ================= SCREEN: USER SELECT ================= */
+.userselect-wrap{width:100%; max-width:640px; text-align:center;}
+.avatar-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-top:30px;}
+.avatar-tile{
+  border:1px solid var(--border); background:var(--panel); border-radius:10px; padding:22px 14px;
+  display:flex; flex-direction:column; align-items:center; gap:10px; transition:all .15s;
+}
+.avatar-tile:hover{border-color:var(--amber); background:var(--panel-alt); transform:translateY(-2px);}
+.avatar-circle{
+  width:56px; height:56px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-head); font-weight:700; font-size:20px; color:#fff;
+}
+.avatar-tile .a-name{font-family:var(--font-head); font-weight:600; font-size:14px; color:var(--text);}
+.avatar-tile .a-count{color:var(--text-faint); font-size:11px;}
+.team-link{margin-top:26px; color:var(--text-dim); font-size:12.5px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; background:none; border:none; font-family:var(--font-mono);}
+.team-link:hover{color:var(--text);}
+
+/* ================= DASHBOARD ================= */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between; padding:14px 22px;
+  border-bottom:1px solid var(--border); background:rgba(20,23,29,0.9); backdrop-filter:blur(6px);
+  position:sticky; top:0; z-index:30;
+}
+.topbar-left{display:flex; align-items:center; gap:12px;}
+.topbar-left .brand-mark{width:28px; height:28px; box-shadow:none;}
+.topbar-left .brand-mark svg{width:15px; height:15px;}
+.tb-title{font-family:var(--font-head); font-weight:700; font-size:15px; letter-spacing:0.04em;}
+.tb-week{color:var(--text-faint); font-size:11.5px; margin-left:14px; padding-left:14px; border-left:1px solid var(--border);}
+.topbar-right{display:flex; align-items:center; gap:10px;}
+.icon-btn{
+  background:var(--panel-raised); border:1px solid var(--border); border-radius:5px; width:34px; height:34px;
+  display:flex; align-items:center; justify-content:center; color:var(--text-dim);
+}
+.icon-btn:hover{color:var(--text); border-color:var(--text-dim);}
+.icon-btn svg{width:16px; height:16px;}
+.user-chip{
+  display:flex; align-items:center; gap:8px; background:var(--panel-raised); border:1px solid var(--border);
+  border-radius:20px; padding:5px 12px 5px 5px; position:relative;
+}
+.user-chip .avatar-circle{width:24px; height:24px; font-size:11px;}
+.user-chip .u-name{font-family:var(--font-head); font-weight:600; font-size:12.5px;}
+.user-menu{
+  position:absolute; top:calc(100% + 8px); right:0; background:var(--panel-raised); border:1px solid var(--border);
+  border-radius:8px; padding:6px; min-width:190px; box-shadow:0 10px 30px rgba(0,0,0,0.4); z-index:50;
+}
+.user-menu button{
+  display:flex; align-items:center; gap:9px; width:100%; text-align:left; background:none; border:none;
+  color:var(--text); padding:8px 9px; border-radius:5px; font-size:12.5px;
+}
+.user-menu button:hover{background:var(--panel-alt);}
+.user-menu .um-avatar{width:20px; height:20px; border-radius:50%; font-size:9px; display:flex; align-items:center; justify-content:center; font-family:var(--font-head); font-weight:700; color:#fff; flex:none;}
+.user-menu hr{border:none; border-top:1px solid var(--border); margin:5px 2px;}
+
+.main{max-width:1360px; margin:0 auto; padding:26px 22px 70px; width:100%;}
+
+/* Andon tiles */
+.andon-row{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:8px;}
+.andon-tile{
+  border:1px solid var(--border); border-radius:10px; padding:18px 18px 16px; background:var(--panel);
+  cursor:pointer; text-align:left; position:relative; overflow:visible; transition:all .15s;
+}
+.andon-tile:hover{transform:translateY(-2px); border-color:var(--panel-raised);}
+.andon-tile.active{border-color:currentColor; background:var(--panel-alt);}
+.andon-tile .at-top{display:flex; align-items:center; justify-content:space-between;}
+.andon-tile .at-light{width:11px; height:11px; border-radius:50%; box-shadow:0 0 12px currentColor;}
+.andon-tile.pulse .at-light{animation:pulse 1.8s infinite;}
+@keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
+.andon-tile .at-count{font-family:var(--font-head); font-size:34px; font-weight:700; margin-top:10px; line-height:1;}
+.andon-tile .at-label{font-family:var(--font-head); font-weight:600; font-size:13px; margin-top:6px; letter-spacing:0.01em;}
+.andon-tile .at-sub{color:var(--text-faint); font-size:11px; margin-top:4px; line-height:1.5;}
+.info-btn{
+  width:17px; height:17px; border-radius:50%; border:1px solid var(--text-faint); color:var(--text-faint);
+  font-family:var(--font-head); font-weight:700; font-size:10px; display:flex; align-items:center; justify-content:center;
+  flex:none; background:transparent; cursor:pointer; font-style:normal;
+}
+.info-btn:hover{border-color:var(--text); color:var(--text);}
+.info-pop{
+  position:absolute; top:calc(100% + 8px); left:0; right:0; z-index:40; background:var(--panel-raised);
+  border:1px solid var(--border); border-radius:8px; padding:12px 14px; text-align:left; cursor:default;
+  box-shadow:0 10px 30px rgba(0,0,0,0.45);
+}
+.info-pop .ip-formula{font-family:var(--font-mono); font-size:11px; color:var(--text); background:var(--panel); border:1px solid var(--border-soft); border-radius:5px; padding:6px 8px; margin-bottom:8px;}
+.info-pop .ip-text{font-size:11.5px; color:var(--text-dim); line-height:1.55;}
+
+.secondary-row{display:flex; gap:10px; margin:14px 0 22px; flex-wrap:wrap;}
+.sec-chip{
+  border:1px solid var(--border); background:var(--panel); border-radius:20px; padding:7px 14px;
+  font-size:11.5px; color:var(--text-dim); display:flex; align-items:center; gap:7px;
+}
+.sec-chip.active{border-color:var(--text-dim); color:var(--text); background:var(--panel-alt);}
+.sec-chip b{color:var(--text); font-family:var(--font-head);}
+
+/* filter bar */
+.filterbar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 14px; background:var(--panel);
+  border:1px solid var(--border); border-radius:8px; margin-bottom:16px;
+}
+.search-input{
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:6px; color:var(--text);
+  padding:9px 12px; font-size:12.5px; width:220px; outline:none;
+}
+.search-input:focus{border-color:var(--amber);}
+.supplier-select{
+  background:var(--panel-alt); border:1px solid var(--border); border-radius:6px; color:var(--text);
+  padding:9px 10px; font-size:12.5px; max-width:200px; outline:none; font-family:var(--font-mono);
+}
+.supplier-select:focus{border-color:var(--amber);}
+.chip-scroll{display:flex; gap:6px; flex-wrap:wrap; flex:1; max-height:74px; overflow-y:auto; align-content:flex-start; padding-right:4px;}
+.fam-chip{
+  border:1px solid var(--border); background:var(--panel-alt); color:var(--text-dim); border-radius:5px;
+  padding:6px 10px; font-size:11px; font-family:var(--font-head); font-weight:600; letter-spacing:0.02em;
+}
+.fam-chip.on{border-color:var(--amber); color:var(--amber); background:rgba(242,169,59,0.08);}
+.filterbar-right{display:flex; align-items:center; gap:8px; margin-left:auto;}
+.scope-toggle{display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden;}
+.scope-toggle button{border:none; background:var(--panel-alt); color:var(--text-dim); padding:8px 12px; font-size:11.5px; font-family:var(--font-head); font-weight:600;}
+.scope-toggle button.on{background:var(--amber); color:#1a1305;}
+
+/* table */
+.list-wrap{border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--panel);}
+.list-head{
+  display:grid; grid-template-columns: 118px 1.4fr 1.1fr 100px 110px 150px 110px 24px;
+  gap:10px; padding:10px 16px; background:var(--panel-alt); border-bottom:1px solid var(--border);
+  font-family:var(--font-head); font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-faint);
+}
+.list-row{
+  display:grid; grid-template-columns: 118px 1.4fr 1.1fr 100px 110px 150px 110px 24px;
+  gap:10px; padding:12px 16px; border-bottom:1px solid var(--border-soft); align-items:center; cursor:pointer;
+  transition:background .1s;
+}
+.list-row:last-child{border-bottom:none;}
+.list-row:hover{background:var(--panel-alt);}
+.cell-pn{font-weight:600; font-size:12.5px; display:flex; align-items:center; gap:2px;}
+.copy-btn{
+  background:none; border:none; color:var(--text-faint); width:20px; height:20px; border-radius:4px;
+  display:flex; align-items:center; justify-content:center; flex:none; padding:0;
+}
+.copy-btn svg{width:13px; height:13px;}
+.copy-btn:hover{color:var(--text); background:var(--panel-raised);}
+.copy-btn.copied{color:var(--green);}
+.cell-pn .owner-dot{display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:6px;}
+.cell-pn .cat-dot{display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:5px;}
+.all-mode-banner{
+  display:flex; align-items:center; gap:8px; padding:10px 16px; background:var(--panel-alt);
+  border-bottom:1px solid var(--border); font-size:11.5px; color:var(--text-dim);
+}
+.all-mode-banner svg{width:14px; height:14px; color:var(--text-faint); flex:none;}
+.cell-proj{display:flex; gap:5px; flex-wrap:wrap;}
+.tag{font-size:10px; padding:2px 6px; border-radius:3px; background:var(--panel-raised); color:var(--text-dim); font-family:var(--font-head); font-weight:600;}
+.cell-supplier{font-size:11.5px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.cell-num{font-size:12px; text-align:right; font-variant-numeric:tabular-nums;}
+.cell-metric{font-size:12px; text-align:right;}
+.cell-metric .m-main{font-weight:700; font-family:var(--font-head); font-size:13px;}
+.cell-metric .m-sub{color:var(--text-faint); font-size:10px;}
+.cell-spark{display:flex; align-items:center; justify-content:flex-end;}
+.cell-arrow{color:var(--text-faint); text-align:right;}
+.empty-state{padding:60px 20px; text-align:center; color:var(--text-faint); font-size:12.5px;}
+.empty-state svg{width:32px; height:32px; margin:0 auto 12px; opacity:0.5;}
+
+.list-footer{display:flex; justify-content:space-between; align-items:center; padding:14px 16px; font-size:11.5px; color:var(--text-faint);}
+
+/* ================= DETAIL DRAWER ================= */
+.overlay{position:fixed; inset:0; background:rgba(8,10,14,0.6); z-index:90; backdrop-filter:blur(2px);}
+.drawer{
+  position:fixed; top:0; right:0; height:100vh; width:min(680px, 100vw); background:var(--panel);
+  border-left:1px solid var(--border); z-index:100; overflow-y:auto; box-shadow:-20px 0 50px rgba(0,0,0,0.5);
+}
+.drawer-head{padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; position:sticky; top:0; background:var(--panel); z-index:5;}
+.drawer-pn{font-family:var(--font-head); font-size:22px; font-weight:700;}
+.drawer-tags{display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;}
+.drawer-close{background:var(--panel-raised); border:1px solid var(--border); border-radius:6px; width:32px; height:32px; color:var(--text-dim); flex:none;}
+.drawer-body{padding:22px 24px 60px;}
+.dr-section{margin-bottom:26px;}
+.dr-section h4{font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-faint); margin-bottom:12px;}
+.status-banner{
+  border-radius:8px; padding:14px 16px; display:flex; align-items:center; gap:12px; margin-bottom:20px; border:1px solid;
+}
+.status-banner .sb-icon{width:20px; height:20px; flex:none;}
+.status-banner .sb-title{font-family:var(--font-head); font-weight:700; font-size:14px;}
+.status-banner .sb-sub{font-size:11.5px; color:var(--text-dim); margin-top:2px;}
+.kpi-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
+.kpi-box{border:1px solid var(--border); border-radius:6px; padding:12px; background:var(--panel-alt);}
+.kpi-box .k-label{font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.05em; font-family:var(--font-head);}
+.kpi-box .k-val{font-family:var(--font-head); font-size:18px; font-weight:700; margin-top:4px;}
+.kpi-box .k-detail{font-size:10px; color:var(--text-faint); margin-top:3px;}
+.raben-note{
+  display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text-dim);
+  background:var(--panel-alt); border:1px solid var(--border-soft); border-radius:6px; padding:9px 12px; margin-bottom:24px;
+}
+.raben-note svg{width:14px; height:14px; flex:none; color:var(--text-faint);}
+.raben-note b{color:var(--text); font-weight:600;}
+.chart-legend{display:flex; gap:16px; margin-bottom:8px; flex-wrap:wrap;}
+.chart-legend .lg-item{display:flex; align-items:center; gap:6px; font-size:10.5px; color:var(--text-dim);}
+.lg-swatch{width:10px; height:10px; border-radius:2px;}
+.info-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 20px;}
+.info-item{border-bottom:1px solid var(--border-soft); padding-bottom:8px;}
+.info-item .i-label{font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.05em; font-family:var(--font-head);}
+.info-item .i-val{font-size:12.5px; margin-top:3px; word-break:break-word;}
+.oo-table{width:100%; border-collapse:collapse; font-size:11.5px;}
+.oo-table th{text-align:left; color:var(--text-faint); font-family:var(--font-head); font-weight:600; text-transform:uppercase; font-size:9.5px; letter-spacing:0.05em; padding:6px 8px; border-bottom:1px solid var(--border);}
+.oo-table td{padding:7px 8px; border-bottom:1px solid var(--border-soft);}
+.oo-empty{color:var(--text-faint); font-size:12px; padding:10px 0;}
+.chart-fallback{
+  display:flex; align-items:flex-start; gap:10px; color:var(--text-dim); font-size:12px; line-height:1.6;
+  background:var(--panel-alt); border:1px solid var(--border-soft); border-radius:6px; padding:14px 16px;
+}
+.chart-fallback svg{width:16px; height:16px; flex:none; color:var(--amber); margin-top:1px;}
+
+/* settings popover */
+.settings-pop{
+  position:absolute; top:calc(100% + 8px); right:0; background:var(--panel-raised); border:1px solid var(--border);
+  border-radius:8px; padding:16px; width:260px; z-index:50; box-shadow:0 10px 30px rgba(0,0,0,0.4);
+}
+.settings-pop label{display:block; font-size:11px; color:var(--text-dim); margin-bottom:5px; font-family:var(--font-head); font-weight:600;}
+.settings-pop input[type=number]{
+  width:100%; background:var(--panel); border:1px solid var(--border); border-radius:5px; color:var(--text);
+  padding:7px 9px; font-size:12.5px; margin-bottom:14px;
+}
+.settings-pop .sp-note{font-size:10.5px; color:var(--text-faint); line-height:1.5; margin-top:2px;}
+
+.rel{position:relative;}
+.hidden{display:none !important;}
+
+canvas{max-width:100%;}
+
+/* ============ LANGUAGE SWITCHER ============ */
+.lang-switch{display:flex; gap:2px; background:var(--panel-alt); border:1px solid var(--border); border-radius:6px; padding:2px; flex:none;}
+.lang-btn{
+  background:none; border:none; color:var(--text-faint); font-size:10.5px; font-weight:700;
+  font-family:var(--font-head); padding:4px 8px; border-radius:4px; letter-spacing:0.06em;
+}
+.lang-btn:hover{color:var(--text);}
+.lang-btn.on{background:var(--panel-raised); color:var(--text);}
+
+/* ============ EDI PLANNER ============ */
+.edi-open-btn{display:inline-flex; align-items:center; gap:8px; text-transform:none; letter-spacing:0.02em; font-size:12.5px;}
+.edi-open-btn svg{width:15px; height:15px;}
+.edi-open-hint{font-size:11.5px; color:var(--text-faint); margin-top:8px; line-height:1.5;}
+.edi-planner{border:1px solid var(--border); border-radius:8px; padding:14px 16px; background:var(--panel-alt);}
+.edi-head{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+.edi-head h4{font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-faint);}
+.edi-actions{display:flex; gap:6px; flex-wrap:wrap;}
+.edi-actions .btn{padding:7px 12px; font-size:11.5px; display:inline-flex; align-items:center; gap:6px; text-transform:none; letter-spacing:0.02em;}
+.edi-actions .btn svg{width:13px; height:13px;}
+.edi-explain{font-size:11.5px; color:var(--text-dim); line-height:1.6; margin-bottom:12px;}
+.edi-explain b{color:var(--text);}
+.edi-verdict{display:flex; align-items:flex-start; gap:10px; border-radius:6px; padding:10px 12px; font-size:12px; line-height:1.55; margin-bottom:12px; border:1px solid;}
+.edi-verdict svg{width:16px; height:16px; flex:none; margin-top:2px;}
+.edi-verdict.ok{background:var(--green-tint); border-color:rgba(58,212,138,0.4); color:var(--text);}
+.edi-verdict.ok svg{color:var(--green);}
+.edi-verdict.warn{background:var(--amber-tint); border-color:rgba(242,169,59,0.4); color:var(--text);}
+.edi-verdict.warn svg{color:var(--amber);}
+.edi-verdict.bad{background:var(--red-tint); border-color:rgba(240,80,63,0.4); color:var(--text);}
+.edi-verdict.bad svg{color:var(--red);}
+.edi-strip-wrap{overflow-x:auto; padding-bottom:6px; margin:0 -4px;}
+.edi-strip{display:flex; gap:6px; padding:0 4px; min-width:max-content;}
+.edi-cell{
+  width:92px; flex:none; border:1px solid var(--border); border-radius:6px; padding:8px 6px 6px;
+  background:var(--panel); display:flex; flex-direction:column; align-items:center; gap:4px; position:relative;
+  transition:border-color .15s, background .15s;
+}
+.edi-cell.st-ok{border-color:rgba(58,212,138,0.35);}
+.edi-cell.st-demand{border-color:rgba(167,139,250,0.55); background:rgba(167,139,250,0.06);}
+.edi-cell.st-transport{border-color:rgba(242,169,59,0.55); background:rgba(242,169,59,0.06);}
+.edi-cell.st-rupture{border-color:rgba(240,80,63,0.6); background:rgba(240,80,63,0.07);}
+.edi-date{font-family:var(--font-head); font-weight:600; font-size:11px; color:var(--text);}
+.edi-existing{font-size:9.5px; color:var(--text-faint); white-space:nowrap; min-height:12px;}
+.edi-input{
+  width:100%; background:var(--panel-alt); border:1px solid var(--border); border-radius:4px; color:var(--text);
+  padding:5px 4px; font-size:11.5px; text-align:right; outline:none; -moz-appearance:textfield;
+}
+.edi-input::-webkit-outer-spin-button, .edi-input::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+.edi-input:focus{border-color:var(--amber);}
+.edi-hint{font-size:10px; color:var(--green); font-family:var(--font-head); font-weight:600; white-space:nowrap; min-height:13px;}
+.edi-hint.need{color:var(--amber);}
+.edi-dot{width:8px; height:8px; border-radius:50%; background:var(--green); display:inline-block;}
+.st-demand .edi-dot, .edi-dot.st-demand{background:var(--violet);}
+.st-transport .edi-dot, .edi-dot.st-transport{background:var(--amber);}
+.st-rupture .edi-dot, .edi-dot.st-rupture{background:var(--red);}
+.edi-legend{display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:10.5px; color:var(--text-dim);}
+.edi-legend span{display:inline-flex; align-items:center; gap:5px;}
+.edi-legend .edi-dot{width:7px; height:7px;}
+
+/* ============ TEAM OVERVIEW ============ */
+.ov-summary{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px;}
+.ov-card{border:1px solid var(--border); border-radius:10px; padding:16px 18px; background:var(--panel);}
+.ov-card .ov-num{font-family:var(--font-head); font-size:26px; font-weight:700; color:var(--text);}
+.ov-card .ov-label{font-size:11px; margin-top:4px; font-family:var(--font-head); font-weight:600;}
+.ov-toolbar{display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+.ov-toolbar-label{font-size:11.5px; color:var(--text-faint); font-family:var(--font-head); font-weight:600;}
+.sort-chip{
+  border:1px solid var(--border); background:var(--panel); color:var(--text-dim); border-radius:20px;
+  padding:6px 13px; font-size:11.5px; font-family:var(--font-head); font-weight:600;
+}
+.sort-chip.on{border-color:var(--amber); color:var(--amber); background:rgba(242,169,59,0.08);}
+.ov-table{border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--panel);}
+.ov-head, .ov-row{
+  display:grid; grid-template-columns: 1.4fr 1fr 80px 90px 90px 80px 110px 90px 65px 1.2fr;
+  gap:8px; padding:12px 14px; align-items:center;
+}
+.ov-head{
+  background:var(--panel-alt); border-bottom:1px solid var(--border); font-family:var(--font-head);
+  font-size:10px; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-faint);
+}
+.ov-row{border-bottom:1px solid var(--border-soft); cursor:pointer; transition:background .1s;}
+.ov-row:last-child{border-bottom:none;}
+.ov-row:hover{background:var(--panel-alt);}
+.ov-owner{display:flex; align-items:center; gap:10px;}
+.ov-owner-name{font-family:var(--font-head); font-weight:600; font-size:13px;}
+.ov-owner-sub{font-size:10px; color:var(--text-faint); margin-top:2px;}
+.ov-bar-cell{display:flex; align-items:center;}
+.ov-bar-wrap{min-width:40px; width:100%;}
+.ov-barplot{border:1px solid var(--border-soft); border-radius:8px; padding:12px; background:var(--panel-alt);}
+.ov-num-cell{text-align:right; font-size:13px; font-variant-numeric:tabular-nums;}
+.ov-urgent{font-size:11px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.ov-footnote{margin-top:12px; font-size:11.5px; color:var(--text-faint); text-align:center;}
+@media (max-width: 1000px){
+  .ov-head{display:none;}
+  .ov-row{grid-template-columns:1fr; gap:6px; padding:14px 16px;}
+  .ov-num-cell{text-align:left;}
+  .ov-num-cell::before{content:attr(data-label); color:var(--text-faint); margin-right:6px;}
+}
+
+@media (max-width: 860px){
+  .andon-row{grid-template-columns:repeat(2,1fr);}
+  .list-head{display:none;}
+  .list-row{grid-template-columns:1fr; gap:4px; padding:14px 16px;}
+  .cell-num,.cell-metric,.cell-arrow{text-align:left;}
+  .cell-spark{display:none;}
+  .info-grid{grid-template-columns:1fr;}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* =========================================================================
+   ANDON - Raw Materials Radar
+   Turns a weekly supply-planning workbook (consumption plan, projected stock,
+   open delivery schedules) into a priority view, and helps adjust supplier EDIs.
+   Everything runs in the browser: no data leaves the machine.
+   ========================================================================= */
+
+/* ---------------------------- CONSTANTS ---------------------------- */
+const COLORS = {
+  RUPTURE:               { c:'var(--red)',    hex:'#f0503f', tint:'var(--red-tint)',    label:'Rupture',                   icon:'stop' },
+  UNDER_SAFETY_TRANSPORT:{ c:'var(--amber)',  hex:'#f2a93b', tint:'var(--amber-tint)',  label:'Sécurité transport',      icon:'warn' },
+  UNDER_SAFETY_DEMAND:   { c:'var(--violet)', hex:'#a78bfa', tint:'var(--violet-tint)', label:'Sécurité demande',        icon:'spike' },
+  OVERSTOCK:             { c:'var(--blue)',   hex:'#4c9fe8', tint:'var(--blue-tint)',   label:'Surstock',                  icon:'stack' },
+  SWEET_SPOT:            { c:'var(--green)',  hex:'#3ad48a', tint:'var(--green-tint)',  label:'Zone saine',                icon:'check' },
+  INACTIVE:              { c:'var(--gray)',   hex:'#6b7480', tint:'var(--gray-tint)',   label:'Sans mouvement',            icon:'dash' },
+};
+const CATEGORY_ORDER = ['RUPTURE','UNDER_SAFETY_TRANSPORT','UNDER_SAFETY_DEMAND','OVERSTOCK','SWEET_SPOT'];
+const OWNER_COLORS = ['#f2a93b','#4c9fe8','#3ad48a','#e874c8','#9b8cf2','#f0503f'];
+
+let SETTINGS = { safetyDelayWeeks: 2, overstockValueThreshold: 1000000, ruptureHorizonWeeks: 12, demandSpikeMultiplier: 2 };
+
+/* ---------------------------- I18N ---------------------------- */
+let LANG = 'fr';
+function LOCALE(){ return LANG==='fr' ? 'fr-FR' : (LANG==='it' ? 'it-IT' : 'en-GB'); }
+const I18N = {
+fr: {
+  brand_sub:"Radar Matières Premières",
+  upload_intro:"Cet outil transforme le plan de production (besoin hebdo par référence) et le stock projeté en une vue de priorité claire : quelles matières risquent la rupture, lesquelles passent sous le stock de sécurité, lesquelles sont en surstock. Déposez soit les 3 exports CSV, soit le classeur Excel complet (avec les feuilles Need, New R et Open Orders) : l'outil reconnaît automatiquement chaque fichier ou feuille.",
+  dz_title:"Glissez vos fichiers ici",
+  dz_sub:"3 fichiers CSV (Need · Référentiel New_R · Commandes ouvertes) ou un seul classeur Excel (.xlsx)",
+  fc_need:"Need (prévisions)", fc_master:"Référentiel (New_R)", fc_oo:"Commandes ouvertes", fc_waiting:"en attente…",
+  btn_continue:"Continuer →",
+  step22:"Étape 2 / 2", who_are_you:"Qui êtes-vous ?",
+  userselect_intro:"Sélectionnez votre prénom pour n'afficher que vos références. Vous pourrez changer d'utilisateur à tout moment via l'icône en haut à droite.",
+  ref_one:"référence", ref_many:"références",
+  see_team:"Voir toute l'équipe (vue globale) →",
+  week_label:"Semaine {0} · {1}",
+  demo_title:"Pas de fichier sous la main ?", demo_note:"La démo charge un jeu de données synthétiques, construit à partir d'un vrai fichier de planification : même format, mêmes ordres de grandeur, mais toutes les valeurs (références, fournisseurs, prix, quantités) sont générées aléatoirement.", demo_btn:"Charger la démo", demo_loading:"Chargement…", demo_badge:"Démo · données synthétiques", demo_badge_tt:"Données synthétiques construites à partir d'un vrai fichier de planification : même format, mêmes ordres de grandeur, aucune valeur réelle. Photo de la semaine {0} : dates et délais sont comptés à partir de cette semaine.", demo_userselect:"Démo : planificateurs et données fictifs. Choisissez un prénom ou ouvrez la vue équipe.", err_demo_load:"Impossible de charger la démo depuis cette page (fichier ouvert en local ?). Glissez {0} dans la zone ci-dessus, ou ouvrez la version en ligne.", stale_tag:"pas la semaine en cours", stale_tt:"Ce fichier n'est pas celui de la semaine en cours : dates et délais sont comptés à partir de la semaine du fichier ({0}).",
+  tt_overview:"Vue d'ensemble par employé", tt_settings:"Réglages des seuils", tt_export:"Exporter la vue en CSV",
+  team:"Équipe", team_view_all:"Vue équipe (tous)",
+  set_horizon:"Horizon urgence : toutes catégories (semaines)",
+  set_delay:"Retard EDI simulé : sécurité transport (semaines)",
+  set_spike:"Multiplicateur pic de demande : sécurité demande",
+  set_overstock:"Valeur immobilisée : surstock (€)",
+  set_note:"Un risque prévu au-delà de l'horizon ci-dessus n'est pas classé \"urgent\" : il apparaît dans Zone saine, signalé à part. Surstock = prix unitaire (mm60) × somme du stock prévu sur les 36 semaines du calendrier.",
+  cat_RUPTURE:"Rupture", cat_UNDER_SAFETY_TRANSPORT:"Sécurité transport", cat_UNDER_SAFETY_DEMAND:"Sécurité demande",
+  cat_OVERSTOCK:"Surstock", cat_SWEET_SPOT:"Zone saine", cat_INACTIVE:"Sans mouvement",
+  info_how:"Comment c'est calculé ?",
+  sub_rupture:"Dans les {0} prochaines semaines",
+  sub_transport:"Retard EDI de {0} sem., dans les {1} prochaines sem.",
+  sub_demand:"Pic de demande à {0}x, dans les {1} prochaines sem.",
+  sub_overstock:"Valeur immobilisée > {0}",
+  sub_sweet:"Zone cible (+ risques lointains)",
+  if_rupture_f:"Stock prévu < 0 dans les {0} prochaines semaines",
+  if_rupture_t:"Avec le plan tel quel (arrivages à l'heure), le stock projeté touche zéro dans les {0} semaines qui viennent. Une rupture prévue plus tard que ça est classée dans Zone saine à part (signalée \"rupture lointaine\").",
+  if_t_f:"On retarde virtuellement tous les arrivages de {0} sem., risque dans les {1} prochaines semaines",
+  if_t_t:"Si tous les fournisseurs/transporteurs prennent {0} semaines de retard sur tout ce qui est prévu, le stock tomberait à zéro dans les {1} semaines qui viennent. Un risque similaire mais plus lointain que ça est classé dans Zone saine à part.",
+  if_d_f:"Stock < {0}× le pic de conso des {1} prochaines semaines",
+  if_d_t:"On prend la semaine la plus consommatrice des {0} prochaines semaines, on la multiplie par {1}, et on vérifie si le stock prévu descend un jour sous ce seuil. Ça simule un coup de demande imprévu, à n'importe quelle semaine, pas un retard de livraison.",
+  if_o_f:"Prix unitaire × stock prévu, cumulé sur 36 sem. > {0}",
+  if_o_t:"On multiplie le prix de la pièce par la quantité en stock chaque semaine, puis on additionne sur tout l'horizon. Un total élevé veut dire beaucoup d'argent immobilisé longtemps, pas juste un pic ponctuel.",
+  if_s_f:"Résiste au retard transport et au pic de demande, sans valeur immobilisée excessive",
+  if_s_t:"Ni fragile, ni en excès de commandes. Inclut aussi les items dont la rupture ou un risque \"sous sécurité\" est prévu au-delà de {0} semaines (pas assez proche pour être urgent, mais visible en sous-catégorie \"lointaine\").",
+  if_i_f:"Stock nul et aucun besoin prévu",
+  if_i_t:"Rien à consommer, rien en stock, pas de risque, mais rien à gérer non plus.",
+  tt_noforecast:"Références présentes dans le référentiel mais sans ligne de prévision (souvent obsolètes)",
+  no_forecast:"Sans prévision",
+  search_ph:"Rechercher PN, fournisseur, projet…", all_suppliers:"Tous les fournisseurs",
+  my_items:"Mes items", whole_team:"Toute l'équipe",
+  empty_list:"Aucune référence dans cette catégorie pour ce filtre.",
+  col_project:"Projet(s)", col_supplier:"Fournisseur", col_status:"Statut", col_stock:"Stock", col_need_wk:"Bes./sem.", col_trend:"Tendance",
+  copy_pn:"Copier le PN",
+  nf_footer:"{0} référence(s) sans prévision",
+  nf_footer2:"Présentes dans le référentiel, absentes du fichier Need",
+  all_banner:"Tous les items, toutes catégories confondues : cliquez une tuile ci-dessus pour filtrer à nouveau.",
+  shown_footer:"{0} référence(s) affichée(s)", all_cats_suffix:" (toutes catégories)",
+  thresholds_footer:"Seuils : rupture ≤ {0} sem. · retard simulé {1} sem. · valeur surstock {2}",
+  m_rupture:"rupture", m_transport:"retard transport", m_demand:"pic de demande", m_value:"valeur immobilisée",
+  m_far_rupture:"rupture lointaine", m_far_transport:"sécurité transport lointaine", m_far_demand:"sécurité demande lointaine",
+  m_none:"aucune rupture prévue",
+  this_week:"cette semaine", in_1_wk:"dans 1 sem.", in_n_wk:"dans {0} sem.", suffix_weeks:" s.",
+  ov_title:"Vue d'ensemble : par employé", back_dash:"Retour au dashboard",
+  ov_rupture_team:"Rupture (équipe)", ov_transport_team:"Sécurité transport (équipe)", ov_demand_team:"Sécurité demande (équipe)",
+  ov_value_team:"Valeur totale du stock : toutes catégories (équipe)", ov_sweet_team:"Zone saine (équipe)",
+  ov_compare:"Comparaison par employé",
+  lg_transport:"Sécurité transport", lg_demand:"Sécurité demande",
+  sort_by:"Trier le tableau par :", sort_value:"Valeur stock", sort_total:"Total items", sort_name:"Nom",
+  ov_employee:"Employé", ov_split:"Répartition", ov_sec_t:"Séc. transport", ov_sec_d:"Séc. demande",
+  ov_value_col:"Valeur stock totale", ov_total:"Total", ov_urgent:"Le plus urgent",
+  ov_nf_sub:"{0} sans prévision",
+  ov_footnote:"Cliquez sur un employé pour ouvrir sa vue filtrée (catégorie Rupture). \"Valeur stock totale\" = prix unitaire × stock prévu cumulé sur 36 sem., toutes catégories confondues.",
+  b_already:"Déjà en rupture", b_rupture_t:"Rupture prévue {0}",
+  b_rupture_s:"Le stock projeté atteint zéro vers le {0}, même si tout arrive à l'heure.",
+  b_transport_t:"Fragile face à un retard transport",
+  b_transport_s:"Le plan tient tel quel, mais si tous les arrivages prennent {0} sem. de retard, le stock tomberait à zéro vers le {1}.",
+  b_demand_t:"Fragile face à un pic de demande",
+  b_demand_s:"Le plan tient au rythme prévu, mais si la demande grimpait soudainement à {0} unités en une semaine ({1}× le pic des {2} prochaines semaines), le stock tomberait sous ce seuil vers le {3}.",
+  b_overstock_s:"{0} de valeur immobilisée cumulée sur l'horizon (prix unitaire × stock prévu chaque semaine), au-delà du seuil de {1}.",
+  b_far_rupture_t:"Rupture lointaine : {0}",
+  b_far_rupture_s:"Le stock projeté atteint zéro vers le {0}, au-delà de l'horizon de {1} sem. considéré urgent. Pas d'action immédiate requise, mais à surveiller.",
+  b_far_transport_t:"Sécurité transport lointaine : {0}",
+  b_far_transport_s:"Un retard de {0} sem. sur les EDI ferait tomber le stock à zéro vers le {1}, au-delà de l'horizon de {2} sem. considéré urgent.",
+  b_far_demand_t:"Sécurité demande lointaine : {0}",
+  b_far_demand_s:"Un pic de demande à {0}× le pic proche ferait tomber le stock sous ce seuil vers le {1}, au-delà de l'horizon de {2} sem. considéré urgent.",
+  b_sweet_t:"Zone saine",
+  b_sweet_s:"Encaisse {0} sem. de retard transport et un pic de demande à {1}×, et la valeur de stock immobilisée ({2}) reste sous le seuil de surstock.",
+  b_inactive_s:"Aucun besoin prévu sur l'horizon et stock nul.",
+  k_stock:"Stock actuel", k_raben:"dont {0} en transit Raben", k_need:"Besoin hebdo moyen", k_cover:"Couverture actuelle", k_value:"Valeur immobilisée",
+  raben_note:"<b>{0}</b> à l'usine + <b>{1}</b> déjà sécurisé au hub Raben (arrivée ~1 semaine) = <b>{2}</b> de stock actuel.",
+  dr_proj:"Projection de stock ({0} semaines)",
+  lg_transport_sim:"Retard transport (simulé)", lg_spike:"Seuil pic de demande",
+  dr_need:"Besoin hebdomadaire (consommation prévue)", dr_oo:"Commandes en cours (open orders)", dr_info:"Informations référence",
+  i_owner:"Responsable", i_cat:"Catégorie", i_loc:"Localisation fournisseur", i_sa:"N° SA", i_supref:"Référence fournisseur",
+  i_lead:"Lead time", i_moq:"MOQ / Lot", i_incoterm:"Incoterm", i_contact:"Contact", i_comment:"Commentaire",
+  i_project_col:"Projet(s) (colonne Project)", i_status_col:"Catégorie (colonne Status)",
+  oo_empty:"Aucune commande ouverte enregistrée pour cette référence.",
+  oo_arrival:"Arrivée", oo_qty:"Qté", oo_late:"En retard (backlog)", oo_week:"sem. {0}",
+  ch_spike_title:"Seuil pic de demande : {0}", ch_spike_label:"seuil pic demande", ch_orig:"Stock prévu sans nouveaux EDI",
+  edi_open:"Aider à générer des EDI",
+  edi_open_hint:"Simulez de nouveaux EDI semaine par semaine et voyez, en direct, si le stock passe les deux tests de sécurité.",
+  edi_title:"Aide à la génération d'EDI",
+  edi_gen:"Générer", edi_gen_tt:"Remplit chaque semaine avec le minimum juste-à-temps, arrondi aux {0}",
+  edi_clear:"Effacer", edi_csv_tt:"Exporter le plan en CSV", edi_close_tt:"Fermer le planificateur",
+  edi_explain:"Une quantité saisie sur une semaine = un EDI daté de cette semaine (arrivée Raben), donc en stock usine <b>{0} sem. plus tard</b>. Le graphique ci-dessus se met à jour en direct : courbe grise fine = plan actuel, courbe blanche = avec vos EDI, pointillés ambre = vos EDI retardés de {1} sem. Sous chaque semaine, <b>\"+ à ajouter\"</b> = ce qu'il manque encore cette semaine-là pour que tout tienne (compte tenu de ce que vous avez déjà saisi) ; le point = état du stock usine la semaine où cet EDI arrive.",
+  edi_cell_tt:"EDI daté {0} (arrivée Raben) → à l'usine le {1}", edi_already:"déjà {0}",
+  v_ok:"<b>Plan valide</b> : résiste à un retard transport de {0} sem. <i>et</i> à un pic de demande à {1}× (testés séparément). Total nouveaux EDI : <b>{2}</b>.",
+  v_warn_one:"<b>Plan valide sur tout ce qui est corrigeable.</b> 1 semaine reste en défaut mais est trop proche pour qu'un nouvel EDI arrive à temps. Total nouveaux EDI : <b>{0}</b>.",
+  v_warn_many:"<b>Plan valide sur tout ce qui est corrigeable.</b> {0} semaines restent en défaut mais sont trop proches pour qu'un nouvel EDI arrive à temps. Total nouveaux EDI : <b>{1}</b>.",
+  v_bad_one:"<b>1 semaine encore en défaut</b> : première : {0} ({1}).{2} Suivez les \"+ à ajouter\" sous chaque semaine, ou cliquez <b>Générer</b> (arrondi aux {3}).",
+  v_bad_many:"<b>{0} semaines encore en défaut</b> : première : {1} ({2}).{3} Suivez les \"+ à ajouter\" sous chaque semaine, ou cliquez <b>Générer</b> (arrondi aux {4}).",
+  v_unfix_one:" + 1 trop proche pour être corrigée.", v_unfix_many:" + {0} trop proches pour être corrigées.",
+  lg_edi_demand:"sous seuil pic demande", lg_edi_transport:"négatif si retard transport", lg_edi_rupture:"négatif (rupture)",
+  exp_projects:"Projets", exp_w_rupture:"Semaines avant rupture", exp_w_t:"Semaines avant risque transport", exp_w_d:"Semaines avant risque demande",
+  exp_cover:"Couverture actuelle (sem.)", exp_value:"Valeur immobilisée cumulée (€)",
+  eexp_week:"Semaine EDI (arrivée Raben)", eexp_label:"Label semaine", eexp_qty:"Quantité EDI", eexp_arr:"Arrivée usine (estimée)", eexp_none:"(aucun EDI saisi)",
+  err_xlsx_lib:"La librairie de lecture Excel n'a pas pu être chargée (connexion internet bloquée ou instable). Exportez les 3 feuilles (Need, Open Orders, New R) en CSV et uploadez-les séparément à la place.",
+  err_csv_lib:"La librairie de lecture CSV n'a pas pu être chargée (connexion internet bloquée ou instable). Rechargez la page une fois la connexion rétablie.",
+  err_sheets_missing:"Feuille(s) introuvable(s) dans le fichier Excel : {0}. Feuilles disponibles : {1}.",
+  err_xlsx_read:"Erreur de lecture du fichier Excel \"{0}\" : {1}",
+  err_file_unknown:"Le fichier \"{0}\" n'a pas été reconnu. Vérifiez qu'il s'agit bien d'un export Need / Référentiel (New_R) / Commandes ouvertes.",
+  err_file_read:"Erreur de lecture pour \"{0}\": {1}",
+  err_processing:"Erreur pendant le traitement : {0}",
+  unassigned:"Non assigné", uncategorized:"Non catégorisé",
+  err_need_struct:"Structure du fichier Need non reconnue.",
+  err_need_empty:"Aucune ligne de prévision trouvée dans le fichier Need (après filtrage sur les PN commençant par \"1\").",
+  err_master_struct:"Structure du fichier référentiel non reconnue.",
+  err_master_empty:"Aucune ligne trouvée dans le fichier référentiel.",
+  err_oo_struct:"Structure du fichier commandes ouvertes non reconnue.",
+},
+en: {
+  brand_sub:"Raw Materials Radar",
+  upload_intro:"This tool turns the production plan (weekly need per part number) and the projected stock into a clear priority view: which raw materials are heading for a stockout, which fall below safety stock, which are overstocked. Drop either the 3 CSV exports or the full Excel workbook (with the Need, New R and Open Orders sheets): the tool recognises each file or sheet automatically.",
+  dz_title:"Drop your files here",
+  dz_sub:"3 CSV files (Need · New_R master data · Open orders) or a single Excel workbook (.xlsx)",
+  fc_need:"Need (forecast)", fc_master:"Master data (New_R)", fc_oo:"Open orders", fc_waiting:"waiting…",
+  btn_continue:"Continue →",
+  step22:"Step 2 / 2", who_are_you:"Who are you?",
+  userselect_intro:"Select your name to show only your items. You can switch user at any time via the icon in the top-right corner.",
+  ref_one:"item", ref_many:"items",
+  see_team:"View the whole team (global view) →",
+  week_label:"Week {0} · {1}",
+  demo_title:"No file at hand?", demo_note:"The demo loads a synthetic dataset built from a real planning workbook: same format, same orders of magnitude, but every value (part numbers, suppliers, prices, quantities) is randomly generated.", demo_btn:"Load the demo", demo_loading:"Loading…", demo_badge:"Demo · synthetic data", demo_badge_tt:"Synthetic data built from a real planning workbook: same format, same orders of magnitude, no real value. Snapshot of week {0}: dates and delays are counted from that week.", demo_userselect:"Demo: fictional planners and data. Pick a name or open the team view.", err_demo_load:"The demo could not be loaded from this page (file opened locally?). Drop {0} on the zone above, or open the online version.", stale_tag:"not the current week", stale_tt:"This file is not the current week's export: dates and delays are counted from the file's week ({0}).",
+  tt_overview:"Overview by employee", tt_settings:"Threshold settings", tt_export:"Export this view as CSV",
+  team:"Team", team_view_all:"Team view (all)",
+  set_horizon:"Urgency horizon: all categories (weeks)",
+  set_delay:"Simulated EDI delay: transport safety (weeks)",
+  set_spike:"Demand-spike multiplier: demand safety",
+  set_overstock:"Tied-up value: overstock (€)",
+  set_note:"A risk expected beyond the horizon above is not classed as \"urgent\": it appears in the Healthy zone, flagged separately. Overstock = unit price (mm60) × sum of projected stock over the calendar's 36 weeks.",
+  cat_RUPTURE:"Stockout", cat_UNDER_SAFETY_TRANSPORT:"Transport safety", cat_UNDER_SAFETY_DEMAND:"Demand safety",
+  cat_OVERSTOCK:"Overstock", cat_SWEET_SPOT:"Healthy zone", cat_INACTIVE:"No movement",
+  info_how:"How is this calculated?",
+  sub_rupture:"Within the next {0} weeks",
+  sub_transport:"EDI delay of {0} wk, within the next {1} wk",
+  sub_demand:"Demand spike at {0}x, within the next {1} wk",
+  sub_overstock:"Tied-up value > {0}",
+  sub_sweet:"Target zone (+ distant risks)",
+  if_rupture_f:"Projected stock < 0 within the next {0} weeks",
+  if_rupture_t:"With the plan as it stands (arrivals on time), projected stock hits zero within the coming {0} weeks. A stockout expected later than that is filed separately under Healthy zone (flagged \"distant stockout\").",
+  if_t_f:"All arrivals virtually delayed by {0} wk, risk within the next {1} weeks",
+  if_t_t:"If every supplier/carrier ran {0} weeks late on everything planned, stock would hit zero within the coming {1} weeks. A similar but more distant risk is filed separately under Healthy zone.",
+  if_d_f:"Stock < {0}× the consumption peak of the next {1} weeks",
+  if_d_t:"We take the heaviest consumption week of the next {0} weeks, multiply it by {1}, and check whether projected stock ever dips below that threshold. This simulates a sudden demand surge in any week, not a delivery delay.",
+  if_o_f:"Unit price × projected stock, cumulated over 36 wk > {0}",
+  if_o_t:"We multiply the part's unit price by the stock quantity each week, then sum over the whole horizon. A high total means a lot of money tied up for a long time, not just a one-week peak.",
+  if_s_f:"Withstands the transport delay and the demand spike, without excessive tied-up value",
+  if_s_t:"Neither fragile nor over-ordered. Also includes items whose stockout or safety risk is expected beyond {0} weeks (not close enough to be urgent, but visible in the \"distant\" sub-category).",
+  if_i_f:"Zero stock and no forecast need",
+  if_i_t:"Nothing to consume, nothing in stock, no risk, but nothing to manage either.",
+  tt_noforecast:"Items present in the master data but with no forecast line (often obsolete)",
+  no_forecast:"No forecast",
+  search_ph:"Search PN, supplier, project…", all_suppliers:"All suppliers",
+  my_items:"My items", whole_team:"Whole team",
+  empty_list:"No items in this category for this filter.",
+  col_project:"Project(s)", col_supplier:"Supplier", col_status:"Status", col_stock:"Stock", col_need_wk:"Need/wk", col_trend:"Trend",
+  copy_pn:"Copy PN",
+  nf_footer:"{0} item(s) with no forecast",
+  nf_footer2:"Present in the master data, absent from the Need file",
+  all_banner:"All items, all categories combined: click a tile above to filter again.",
+  shown_footer:"{0} item(s) shown", all_cats_suffix:" (all categories)",
+  thresholds_footer:"Thresholds: stockout ≤ {0} wk · simulated delay {1} wk · overstock value {2}",
+  m_rupture:"stockout", m_transport:"transport delay", m_demand:"demand spike", m_value:"tied-up value",
+  m_far_rupture:"distant stockout", m_far_transport:"distant transport risk", m_far_demand:"distant demand risk",
+  m_none:"no stockout expected",
+  this_week:"this week", in_1_wk:"in 1 wk", in_n_wk:"in {0} wk", suffix_weeks:" wk",
+  ov_title:"Overview: by employee", back_dash:"Back to dashboard",
+  ov_rupture_team:"Stockouts (team)", ov_transport_team:"Transport safety (team)", ov_demand_team:"Demand safety (team)",
+  ov_value_team:"Total stock value: all categories (team)", ov_sweet_team:"Healthy zone (team)",
+  ov_compare:"Comparison by employee",
+  lg_transport:"Transport safety", lg_demand:"Demand safety",
+  sort_by:"Sort the table by:", sort_value:"Stock value", sort_total:"Total items", sort_name:"Name",
+  ov_employee:"Employee", ov_split:"Breakdown", ov_sec_t:"Transp. safety", ov_sec_d:"Demand safety",
+  ov_value_col:"Total stock value", ov_total:"Total", ov_urgent:"Most urgent",
+  ov_nf_sub:"{0} with no forecast",
+  ov_footnote:"Click an employee to open their filtered view (Stockout category). \"Total stock value\" = unit price × projected stock cumulated over 36 wk, all categories combined.",
+  b_already:"Already out of stock", b_rupture_t:"Stockout expected {0}",
+  b_rupture_s:"Projected stock reaches zero around {0}, even if everything arrives on time.",
+  b_transport_t:"Fragile to a transport delay",
+  b_transport_s:"The plan holds as is, but if every arrival ran {0} wk late, stock would hit zero around {1}.",
+  b_demand_t:"Fragile to a demand spike",
+  b_demand_s:"The plan holds at the planned pace, but if demand suddenly jumped to {0} units in one week ({1}× the peak of the next {2} weeks), stock would fall below that threshold around {3}.",
+  b_overstock_s:"{0} of tied-up value cumulated over the horizon (unit price × projected stock each week), above the {1} threshold.",
+  b_far_rupture_t:"Distant stockout: {0}",
+  b_far_rupture_s:"Projected stock reaches zero around {0}, beyond the {1}-wk horizon considered urgent. No immediate action required, but worth watching.",
+  b_far_transport_t:"Distant transport risk: {0}",
+  b_far_transport_s:"A {0}-wk delay on EDIs would push stock to zero around {1}, beyond the {2}-wk horizon considered urgent.",
+  b_far_demand_t:"Distant demand risk: {0}",
+  b_far_demand_s:"A demand spike at {0}× the near-term peak would push stock below that threshold around {1}, beyond the {2}-wk horizon considered urgent.",
+  b_sweet_t:"Healthy zone",
+  b_sweet_s:"Withstands {0} wk of transport delay and a {1}× demand spike, and the tied-up stock value ({2}) stays below the overstock threshold.",
+  b_inactive_s:"No forecast need over the horizon and zero stock.",
+  k_stock:"Current stock", k_raben:"incl. {0} in transit at Raben", k_need:"Avg weekly need", k_cover:"Current coverage", k_value:"Tied-up value",
+  raben_note:"<b>{0}</b> at the plant + <b>{1}</b> already secured at the Raben hub (~1 week away) = <b>{2}</b> of current stock.",
+  dr_proj:"Stock projection ({0} weeks)",
+  lg_transport_sim:"Transport delay (simulated)", lg_spike:"Demand-spike threshold",
+  dr_need:"Weekly need (planned consumption)", dr_oo:"Open orders", dr_info:"Item information",
+  i_owner:"Owner", i_cat:"Category", i_loc:"Supplier location", i_sa:"SA no.", i_supref:"Supplier part no.",
+  i_lead:"Lead time", i_moq:"MOQ / Lot", i_incoterm:"Incoterm", i_contact:"Contact", i_comment:"Comment",
+  i_project_col:"Project(s) (Project column)", i_status_col:"Category (Status column)",
+  oo_empty:"No open orders recorded for this item.",
+  oo_arrival:"Arrival", oo_qty:"Qty", oo_late:"Late (backlog)", oo_week:"wk {0}",
+  ch_spike_title:"Demand-spike threshold: {0}", ch_spike_label:"demand-spike threshold", ch_orig:"Projected stock without new EDIs",
+  edi_open:"Help generate EDIs",
+  edi_open_hint:"Sketch new EDIs week by week and see, live, whether stock passes both safety tests.",
+  edi_title:"EDI generation helper",
+  edi_gen:"Generate", edi_gen_tt:"Fills each week with the just-in-time minimum, rounded to the nearest {0}",
+  edi_clear:"Clear", edi_csv_tt:"Export the plan as CSV", edi_close_tt:"Close the planner",
+  edi_explain:"A quantity entered on a week = an EDI dated that week (Raben arrival), so in plant stock <b>{0} wk later</b>. The chart above updates live: thin grey curve = current plan, white curve = with your EDIs, amber dashes = your EDIs delayed by {1} wk. Under each week, <b>\"+ to add\"</b> = what is still missing that week for everything to hold (given what you have already entered); the dot = plant stock status the week this EDI lands.",
+  edi_cell_tt:"EDI dated {0} (Raben arrival) → at the plant on {1}", edi_already:"already {0}",
+  v_ok:"<b>Valid plan</b>: withstands a {0}-wk transport delay <i>and</i> a {1}× demand spike (tested separately). Total new EDIs: <b>{2}</b>.",
+  v_warn_one:"<b>Valid plan on everything fixable.</b> 1 week remains failing but is too close for a new EDI to arrive in time. Total new EDIs: <b>{0}</b>.",
+  v_warn_many:"<b>Valid plan on everything fixable.</b> {0} weeks remain failing but are too close for a new EDI to arrive in time. Total new EDIs: <b>{1}</b>.",
+  v_bad_one:"<b>1 week still failing</b>: first: {0} ({1}).{2} Follow the \"+ to add\" hints under each week, or click <b>Generate</b> (rounded to {3}).",
+  v_bad_many:"<b>{0} weeks still failing</b>: first: {1} ({2}).{3} Follow the \"+ to add\" hints under each week, or click <b>Generate</b> (rounded to {4}).",
+  v_unfix_one:" + 1 too close to be fixed.", v_unfix_many:" + {0} too close to be fixed.",
+  lg_edi_demand:"below demand-spike threshold", lg_edi_transport:"negative if transport delay", lg_edi_rupture:"negative (stockout)",
+  exp_projects:"Projects", exp_w_rupture:"Weeks to stockout", exp_w_t:"Weeks to transport risk", exp_w_d:"Weeks to demand risk",
+  exp_cover:"Current coverage (wk)", exp_value:"Cumulative tied-up value (€)",
+  eexp_week:"EDI week (Raben arrival)", eexp_label:"Week label", eexp_qty:"EDI quantity", eexp_arr:"Plant arrival (estimated)", eexp_none:"(no EDI entered)",
+  err_xlsx_lib:"The Excel reading library could not be loaded (internet connection blocked or unstable). Export the 3 sheets (Need, Open Orders, New R) as CSV and upload them separately instead.",
+  err_csv_lib:"The CSV reading library could not be loaded (internet connection blocked or unstable). Reload the page once the connection is back.",
+  err_sheets_missing:"Sheet(s) not found in the Excel file: {0}. Available sheets: {1}.",
+  err_xlsx_read:"Error reading Excel file \"{0}\": {1}",
+  err_file_unknown:"File \"{0}\" was not recognised. Check that it is a Need / Master data (New_R) / Open orders export.",
+  err_file_read:"Error reading \"{0}\": {1}",
+  err_processing:"Error during processing: {0}",
+  unassigned:"Unassigned", uncategorized:"Uncategorised",
+  err_need_struct:"Need file structure not recognised.",
+  err_need_empty:"No forecast rows found in the Need file (after filtering PNs starting with \"1\").",
+  err_master_struct:"Master data file structure not recognised.",
+  err_master_empty:"No rows found in the master data file.",
+  err_oo_struct:"Open orders file structure not recognised.",
+},
+it: {
+  brand_sub:"Radar Materie Prime",
+  upload_intro:"Questo strumento trasforma il piano di produzione (fabbisogno settimanale per codice) e lo stock previsto in una vista chiara delle priorità: quali materie prime rischiano la rottura di stock, quali scendono sotto la scorta di sicurezza, quali sono in sovrastock. Trascina i 3 export CSV oppure il file Excel completo (con i fogli Need, New R e Open Orders): lo strumento riconosce automaticamente ogni file o foglio.",
+  dz_title:"Trascina qui i tuoi file",
+  dz_sub:"3 file CSV (Need · Anagrafica New_R · Ordini aperti) oppure un unico file Excel (.xlsx)",
+  fc_need:"Need (previsioni)", fc_master:"Anagrafica (New_R)", fc_oo:"Ordini aperti", fc_waiting:"in attesa…",
+  btn_continue:"Continua →",
+  step22:"Passo 2 / 2", who_are_you:"Chi sei?",
+  userselect_intro:"Seleziona il tuo nome per visualizzare solo i tuoi articoli. Potrai cambiare utente in qualsiasi momento tramite l'icona in alto a destra.",
+  ref_one:"riferimento", ref_many:"riferimenti",
+  see_team:"Vedi tutto il team (vista globale) →",
+  week_label:"Settimana {0} · {1}",
+  demo_title:"Nessun file a portata di mano?", demo_note:"La demo carica un set di dati sintetici, costruito a partire da un vero file di pianificazione: stesso formato, stessi ordini di grandezza, ma tutti i valori (codici, fornitori, prezzi, quantità) sono generati casualmente.", demo_btn:"Carica la demo", demo_loading:"Caricamento…", demo_badge:"Demo · dati sintetici", demo_badge_tt:"Dati sintetici costruiti a partire da un vero file di pianificazione: stesso formato, stessi ordini di grandezza, nessun valore reale. Fotografia della settimana {0}: date e ritardi sono contati a partire da quella settimana.", demo_userselect:"Demo: pianificatori e dati fittizi. Scegli un nome o apri la vista team.", err_demo_load:"Impossibile caricare la demo da questa pagina (file aperto in locale?). Trascina {0} nella zona qui sopra, oppure apri la versione online.", stale_tag:"non la settimana in corso", stale_tt:"Questo file non è l'export della settimana in corso: date e ritardi sono contati a partire dalla settimana del file ({0}).",
+  tt_overview:"Panoramica per dipendente", tt_settings:"Impostazioni delle soglie", tt_export:"Esporta la vista in CSV",
+  team:"Team", team_view_all:"Vista team (tutti)",
+  set_horizon:"Orizzonte di urgenza: tutte le categorie (settimane)",
+  set_delay:"Ritardo EDI simulato: sicurezza trasporto (settimane)",
+  set_spike:"Moltiplicatore picco di domanda: sicurezza domanda",
+  set_overstock:"Valore immobilizzato: sovrastock (€)",
+  set_note:"Un rischio previsto oltre l'orizzonte qui sopra non è classificato \"urgente\": compare nella Zona sana, segnalato a parte. Sovrastock = prezzo unitario (mm60) × somma dello stock previsto sulle 36 settimane del calendario.",
+  cat_RUPTURE:"Rottura di stock", cat_UNDER_SAFETY_TRANSPORT:"Sicurezza trasporto", cat_UNDER_SAFETY_DEMAND:"Sicurezza domanda",
+  cat_OVERSTOCK:"Sovrastock", cat_SWEET_SPOT:"Zona sana", cat_INACTIVE:"Senza movimento",
+  info_how:"Come viene calcolato?",
+  sub_rupture:"Nelle prossime {0} settimane",
+  sub_transport:"Ritardo EDI di {0} sett., nelle prossime {1} sett.",
+  sub_demand:"Picco di domanda a {0}x, nelle prossime {1} sett.",
+  sub_overstock:"Valore immobilizzato > {0}",
+  sub_sweet:"Zona target (+ rischi lontani)",
+  if_rupture_f:"Stock previsto < 0 nelle prossime {0} settimane",
+  if_rupture_t:"Con il piano così com'è (arrivi puntuali), lo stock previsto tocca lo zero nelle prossime {0} settimane. Una rottura prevista più in là è classificata a parte nella Zona sana (segnalata \"rottura lontana\").",
+  if_t_f:"Tutti gli arrivi ritardati virtualmente di {0} sett., rischio nelle prossime {1} settimane",
+  if_t_t:"Se tutti i fornitori/trasportatori accumulassero {0} settimane di ritardo su tutto il previsto, lo stock scenderebbe a zero nelle prossime {1} settimane. Un rischio simile ma più lontano è classificato a parte nella Zona sana.",
+  if_d_f:"Stock < {0}× il picco di consumo delle prossime {1} settimane",
+  if_d_t:"Prendiamo la settimana con il consumo più alto delle prossime {0} settimane, la moltiplichiamo per {1} e verifichiamo se lo stock previsto scende mai sotto questa soglia. Simula un'impennata improvvisa della domanda, in qualsiasi settimana, non un ritardo di consegna.",
+  if_o_f:"Prezzo unitario × stock previsto, cumulato su 36 sett. > {0}",
+  if_o_t:"Moltiplichiamo il prezzo unitario del pezzo per la quantità a stock ogni settimana, poi sommiamo su tutto l'orizzonte. Un totale alto significa molto denaro immobilizzato a lungo, non solo un picco isolato.",
+  if_s_f:"Resiste al ritardo di trasporto e al picco di domanda, senza valore immobilizzato eccessivo",
+  if_s_t:"Né fragile, né in eccesso di ordini. Include anche gli articoli la cui rottura o rischio di sicurezza è previsto oltre {0} settimane (non abbastanza vicino da essere urgente, ma visibile nella sotto-categoria \"lontana\").",
+  if_i_f:"Stock a zero e nessun fabbisogno previsto",
+  if_i_t:"Niente da consumare, niente a stock, nessun rischio, ma anche niente da gestire.",
+  tt_noforecast:"Riferimenti presenti nell'anagrafica ma senza riga di previsione (spesso obsoleti)",
+  no_forecast:"Senza previsione",
+  search_ph:"Cerca PN, fornitore, progetto…", all_suppliers:"Tutti i fornitori",
+  my_items:"I miei articoli", whole_team:"Tutto il team",
+  empty_list:"Nessun riferimento in questa categoria per questo filtro.",
+  col_project:"Progetto/i", col_supplier:"Fornitore", col_status:"Stato", col_stock:"Stock", col_need_wk:"Fabb./sett.", col_trend:"Tendenza",
+  copy_pn:"Copia PN",
+  nf_footer:"{0} riferimenti senza previsione",
+  nf_footer2:"Presenti nell'anagrafica, assenti dal file Need",
+  all_banner:"Tutti gli articoli, tutte le categorie: clicca una tessera qui sopra per filtrare di nuovo.",
+  shown_footer:"{0} riferimenti visualizzati", all_cats_suffix:" (tutte le categorie)",
+  thresholds_footer:"Soglie: rottura ≤ {0} sett. · ritardo simulato {1} sett. · valore sovrastock {2}",
+  m_rupture:"rottura", m_transport:"ritardo trasporto", m_demand:"picco di domanda", m_value:"valore immobilizzato",
+  m_far_rupture:"rottura lontana", m_far_transport:"rischio trasporto lontano", m_far_demand:"rischio domanda lontano",
+  m_none:"nessuna rottura prevista",
+  this_week:"questa settimana", in_1_wk:"tra 1 sett.", in_n_wk:"tra {0} sett.", suffix_weeks:" sett.",
+  ov_title:"Panoramica: per dipendente", back_dash:"Torna alla dashboard",
+  ov_rupture_team:"Rotture (team)", ov_transport_team:"Sicurezza trasporto (team)", ov_demand_team:"Sicurezza domanda (team)",
+  ov_value_team:"Valore totale dello stock: tutte le categorie (team)", ov_sweet_team:"Zona sana (team)",
+  ov_compare:"Confronto per dipendente",
+  lg_transport:"Sicurezza trasporto", lg_demand:"Sicurezza domanda",
+  sort_by:"Ordina la tabella per:", sort_value:"Valore stock", sort_total:"Totale articoli", sort_name:"Nome",
+  ov_employee:"Dipendente", ov_split:"Ripartizione", ov_sec_t:"Sic. trasporto", ov_sec_d:"Sic. domanda",
+  ov_value_col:"Valore stock totale", ov_total:"Totale", ov_urgent:"Il più urgente",
+  ov_nf_sub:"{0} senza previsione",
+  ov_footnote:"Clicca su un dipendente per aprire la sua vista filtrata (categoria Rottura). \"Valore stock totale\" = prezzo unitario × stock previsto cumulato su 36 sett., tutte le categorie.",
+  b_already:"Già in rottura di stock", b_rupture_t:"Rottura prevista {0}",
+  b_rupture_s:"Lo stock previsto raggiunge lo zero verso il {0}, anche se tutto arriva puntuale.",
+  b_transport_t:"Fragile a un ritardo di trasporto",
+  b_transport_s:"Il piano regge così com'è, ma se tutti gli arrivi accumulassero {0} sett. di ritardo, lo stock scenderebbe a zero verso il {1}.",
+  b_demand_t:"Fragile a un picco di domanda",
+  b_demand_s:"Il piano regge al ritmo previsto, ma se la domanda salisse improvvisamente a {0} unità in una settimana ({1}× il picco delle prossime {2} settimane), lo stock scenderebbe sotto questa soglia verso il {3}.",
+  b_overstock_s:"{0} di valore immobilizzato cumulato sull'orizzonte (prezzo unitario × stock previsto ogni settimana), oltre la soglia di {1}.",
+  b_far_rupture_t:"Rottura lontana: {0}",
+  b_far_rupture_s:"Lo stock previsto raggiunge lo zero verso il {0}, oltre l'orizzonte di {1} sett. considerato urgente. Nessuna azione immediata richiesta, ma da tenere d'occhio.",
+  b_far_transport_t:"Rischio trasporto lontano: {0}",
+  b_far_transport_s:"Un ritardo di {0} sett. sugli EDI porterebbe lo stock a zero verso il {1}, oltre l'orizzonte di {2} sett. considerato urgente.",
+  b_far_demand_t:"Rischio domanda lontano: {0}",
+  b_far_demand_s:"Un picco di domanda a {0}× il picco a breve termine porterebbe lo stock sotto questa soglia verso il {1}, oltre l'orizzonte di {2} sett. considerato urgente.",
+  b_sweet_t:"Zona sana",
+  b_sweet_s:"Regge {0} sett. di ritardo trasporto e un picco di domanda a {1}×, e il valore di stock immobilizzato ({2}) resta sotto la soglia di sovrastock.",
+  b_inactive_s:"Nessun fabbisogno previsto sull'orizzonte e stock a zero.",
+  k_stock:"Stock attuale", k_raben:"di cui {0} in transito Raben", k_need:"Fabbisogno sett. medio", k_cover:"Copertura attuale", k_value:"Valore immobilizzato",
+  raben_note:"<b>{0}</b> in stabilimento + <b>{1}</b> già al sicuro all'hub Raben (arrivo ~1 settimana) = <b>{2}</b> di stock attuale.",
+  dr_proj:"Proiezione di stock ({0} settimane)",
+  lg_transport_sim:"Ritardo trasporto (simulato)", lg_spike:"Soglia picco di domanda",
+  dr_need:"Fabbisogno settimanale (consumo previsto)", dr_oo:"Ordini in corso (open orders)", dr_info:"Informazioni riferimento",
+  i_owner:"Responsabile", i_cat:"Categoria", i_loc:"Sede fornitore", i_sa:"N. SA", i_supref:"Codice fornitore",
+  i_lead:"Lead time", i_moq:"MOQ / Lotto", i_incoterm:"Incoterm", i_contact:"Contatto", i_comment:"Commento",
+  i_project_col:"Progetto/i (colonna Project)", i_status_col:"Categoria (colonna Status)",
+  oo_empty:"Nessun ordine aperto registrato per questo riferimento.",
+  oo_arrival:"Arrivo", oo_qty:"Q.tà", oo_late:"In ritardo (backlog)", oo_week:"sett. {0}",
+  ch_spike_title:"Soglia picco di domanda: {0}", ch_spike_label:"soglia picco domanda", ch_orig:"Stock previsto senza nuovi EDI",
+  edi_open:"Aiuta a generare gli EDI",
+  edi_open_hint:"Simula nuovi EDI settimana per settimana e vedi, in tempo reale, se lo stock supera i due test di sicurezza.",
+  edi_title:"Assistente alla generazione di EDI",
+  edi_gen:"Genera", edi_gen_tt:"Riempie ogni settimana con il minimo just-in-time, arrotondato a {0}",
+  edi_clear:"Cancella", edi_csv_tt:"Esporta il piano in CSV", edi_close_tt:"Chiudi il pianificatore",
+  edi_explain:"Una quantità inserita su una settimana = un EDI datato quella settimana (arrivo Raben), quindi a stock in stabilimento <b>{0} sett. dopo</b>. Il grafico qui sopra si aggiorna in tempo reale: curva grigia sottile = piano attuale, curva bianca = con i tuoi EDI, tratteggio ambra = i tuoi EDI ritardati di {1} sett. Sotto ogni settimana, <b>\"+ da aggiungere\"</b> = quanto manca ancora quella settimana perché tutto regga (tenendo conto di ciò che hai già inserito); il punto = stato dello stock in stabilimento la settimana in cui questo EDI arriva.",
+  edi_cell_tt:"EDI datato {0} (arrivo Raben) → in stabilimento il {1}", edi_already:"già {0}",
+  v_ok:"<b>Piano valido</b>: resiste a un ritardo di trasporto di {0} sett. <i>e</i> a un picco di domanda a {1}× (testati separatamente). Totale nuovi EDI: <b>{2}</b>.",
+  v_warn_one:"<b>Piano valido su tutto ciò che è correggibile.</b> 1 settimana resta in difetto ma è troppo vicina perché un nuovo EDI arrivi in tempo. Totale nuovi EDI: <b>{0}</b>.",
+  v_warn_many:"<b>Piano valido su tutto ciò che è correggibile.</b> {0} settimane restano in difetto ma sono troppo vicine perché un nuovo EDI arrivi in tempo. Totale nuovi EDI: <b>{1}</b>.",
+  v_bad_one:"<b>1 settimana ancora in difetto</b>: prima: {0} ({1}).{2} Segui i suggerimenti \"+ da aggiungere\" sotto ogni settimana, oppure clicca <b>Genera</b> (arrotondato a {3}).",
+  v_bad_many:"<b>{0} settimane ancora in difetto</b>: prima: {1} ({2}).{3} Segui i suggerimenti \"+ da aggiungere\" sotto ogni settimana, oppure clicca <b>Genera</b> (arrotondato a {4}).",
+  v_unfix_one:" + 1 troppo vicina per essere corretta.", v_unfix_many:" + {0} troppo vicine per essere corrette.",
+  lg_edi_demand:"sotto la soglia del picco di domanda", lg_edi_transport:"negativo in caso di ritardo trasporto", lg_edi_rupture:"negativo (rottura)",
+  exp_projects:"Progetti", exp_w_rupture:"Settimane alla rottura", exp_w_t:"Settimane al rischio trasporto", exp_w_d:"Settimane al rischio domanda",
+  exp_cover:"Copertura attuale (sett.)", exp_value:"Valore immobilizzato cumulato (€)",
+  eexp_week:"Settimana EDI (arrivo Raben)", eexp_label:"Etichetta settimana", eexp_qty:"Quantità EDI", eexp_arr:"Arrivo stabilimento (stimato)", eexp_none:"(nessun EDI inserito)",
+  err_xlsx_lib:"La libreria di lettura Excel non è stata caricata (connessione internet bloccata o instabile). Esporta i 3 fogli (Need, Open Orders, New R) in CSV e caricali separatamente.",
+  err_csv_lib:"La libreria di lettura CSV non è stata caricata (connessione internet bloccata o instabile). Ricarica la pagina quando la connessione torna.",
+  err_sheets_missing:"Foglio/i non trovato/i nel file Excel: {0}. Fogli disponibili: {1}.",
+  err_xlsx_read:"Errore di lettura del file Excel \"{0}\": {1}",
+  err_file_unknown:"Il file \"{0}\" non è stato riconosciuto. Verifica che sia un export Need / Anagrafica (New_R) / Ordini aperti.",
+  err_file_read:"Errore di lettura per \"{0}\": {1}",
+  err_processing:"Errore durante l'elaborazione: {0}",
+  unassigned:"Non assegnato", uncategorized:"Non categorizzato",
+  err_need_struct:"Struttura del file Need non riconosciuta.",
+  err_need_empty:"Nessuna riga di previsione trovata nel file Need (dopo il filtro sui PN che iniziano con \"1\").",
+  err_master_struct:"Struttura del file anagrafica non riconosciuta.",
+  err_master_empty:"Nessuna riga trovata nel file anagrafica.",
+  err_oo_struct:"Struttura del file ordini aperti non riconosciuta.",
+},
+};
+function t(key, ...args){
+  const pack = I18N[LANG] || I18N.fr;
+  let str = pack[key] !== undefined ? pack[key] : (I18N.fr[key] !== undefined ? I18N.fr[key] : key);
+  return str.replace(/\{(\d+)\}/g, (m,i)=> args[i]!==undefined ? args[i] : m);
+}
+// Internal fallback keys ('Non assigné', 'Non catégorisé') stay as they are in the data model;
+// these helpers translate them at display time only.
+function ownerLabel(o){ return o==='Non assigné' ? t('unassigned') : o; }
+function famLabel(f){ return f==='Non catégorisé' ? t('uncategorized') : f; }
+function renderLangSwitcher(){
+  return `<div class="lang-switch">${['fr','en','it'].map(l=>`<button class="lang-btn ${LANG===l?'on':''}" data-lang="${l}" title="${l==='fr'?'Français':l==='en'?'English':'Italiano'}">${l.toUpperCase()}</button>`).join('')}</div>`;
+}
+
+
+const state = {
+  screen: 'upload', // upload | user | dashboard
+  files: { need:null, master:null, openOrders:null },
+  fileMeta: { need:null, master:null, openOrders:null },
+  parseError: null,
+  demo: false,          // true when the bundled synthetic sample is loaded
+  demoLoading: false,
+  calendar: null,       // { anchor:Date, weekStart:Date, weekNum } read from the file's week dates (null → falls back to today)
+  items: [],            // joined + computed
+  owners: [],
+  currentOwner: null,   // null = team view
+  category: 'RUPTURE',
+  search: '',
+  familyFilter: new Set(),
+  supplierFilter: '',
+  overviewSort: 'RUPTURE',
+  ediPlannerOpen: false,
+  ediPlan: null,        // { pn, qty: number[] } indexed by weeklyNeed index j
+  scope: 'mine',        // mine | team
+  userMenuOpen: false,
+  infoOpen: null,
+  settingsOpen: false,
+  drawerItem: null,
+  sortDir: 'asc',
+};
+
+/* ---------------------------- ICONS (inline svg, stroke=currentColor) ---------------------------- */
+const ICONS = {
+  upload: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0-12l-4.5 4.5M12 3l4.5 4.5"/><path d="M4 16v2.5A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V16"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>`,
+  x: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+  stop: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.01"/></svg>`,
+  warn: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l9.5 17H2.5L12 3z"/><path d="M12 10v4M12 17v.01"/></svg>`,
+  spike: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-9 4 5 4-11 5 15"/></svg>`,
+  stack: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4-8 4-8-4 8-4z"/><path d="M4 12l8 4 8-4M4 16l8 4 8-4"/></svg>`,
+  dash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>`,
+  user: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>`,
+  team: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.2"/><circle cx="17" cy="9.5" r="2.6"/><path d="M3 19c1-3.3 3.6-5 6-5s5 1.7 6 5M15.5 14.3c2 .2 3.8 1.6 4.5 4.2"/></svg>`,
+  settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.9 7.9 0 0 0 0-3l2-1.6-2-3.4-2.4.7a7.7 7.7 0 0 0-2.6-1.5L14 2h-4l-.4 2.7a7.7 7.7 0 0 0-2.6 1.5l-2.4-.7-2 3.4 2 1.6a7.9 7.9 0 0 0 0 3l-2 1.6 2 3.4 2.4-.7c.77.65 1.65 1.16 2.6 1.5L10 22h4l.4-2.7a7.7 7.7 0 0 0 2.6-1.5l2.4.7 2-3.4-2-1.6z"/></svg>`,
+  download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17"/></svg>`,
+  search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.5-4.5"/></svg>`,
+  arrow: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>`,
+  chevDown: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>`,
+  copy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>`,
+  chart: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V10M11 19V5M18 19v-7"/><path d="M3 19h18"/></svg>`,
+  arrowLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>`,
+  logo: `<svg viewBox="0 0 24 24" fill="none" stroke="#10131a" stroke-width="2"><circle cx="7" cy="12" r="2.4" fill="#10131a" stroke="none"/><circle cx="12" cy="12" r="2.4" fill="#10131a" stroke="none" opacity="0.55"/><circle cx="17" cy="12" r="2.4" fill="#10131a" stroke="none" opacity="0.3"/></svg>`,
+  box: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/></svg>`,
+};
+
+/* ---------------------------- UTIL ---------------------------- */
+function h(strings, ...vals){ return strings.reduce((a,s,i)=> a + s + (vals[i]!==undefined? vals[i] : ''), ''); }
+function esc(s){ return (s===undefined||s===null) ? '' : String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmtNum(n){
+  if(n===null||n===undefined||isNaN(n)) return '-';
+  const r = Math.round(n);
+  return r.toLocaleString(LOCALE());
+}
+function fmtAxis(n){
+  // compact axis labels ("135k", "-37k", "1.2M") so that large or negative values fit in the chart margin
+  if(n===null||n===undefined||isNaN(n)) return '';
+  const a = Math.abs(n), sign = n<0 ? '-' : '';
+  if(a>=1e6) return sign + (a/1e6).toLocaleString(LOCALE(),{maximumFractionDigits:1}) + 'M';
+  if(a>=1e4) return sign + Math.round(a/1e3).toLocaleString(LOCALE()) + 'k';
+  if(a>=1e3) return sign + (a/1e3).toLocaleString(LOCALE(),{maximumFractionDigits:1}) + 'k';
+  return sign + Math.round(a).toLocaleString(LOCALE());
+}
+function fmtWeeks(n){
+  if(n===null||n===undefined) return '-';
+  if(n===0) return t('this_week');
+  if(n===1) return t('in_1_wk');
+  return t('in_n_wk', n);
+}
+function fmtEur(n){
+  if(n===null||n===undefined||isNaN(n)||!isFinite(n)) return '-';
+  if(Math.abs(n)>=1000000) return (n/1000000).toLocaleString(LOCALE(),{maximumFractionDigits:1})+' M€';
+  if(Math.abs(n)>=1000) return (n/1000).toLocaleString(LOCALE(),{maximumFractionDigits:0})+' k€';
+  return Math.round(n).toLocaleString(LOCALE())+' €';
+}
+function isNumericStr(s){ if(s==null) return false; const t=String(s).trim(); if(t==='') return false; return !isNaN(Number(t)); }
+/* ---------------------------- FILE CALENDAR ----------------------------
+   Every date the app computes (chart axis, "stock hits zero around…", plant arrivals) is anchored on
+   the week dates written in the Need sheet, not on the day the file is opened. That keeps them
+   consistent with the delivery dates read from the file, including when an older export or the demo
+   is opened. Stock point i is the stock at the close of a week, labelled with the Monday that follows:
+   point 0 is "now" for the file's own week. If the file's dates can't be read, the calendar falls
+   back to today, which gives the same result for the current week's export.
+   ----------------------------------------------------------------------------------------------- */
+const MONTH_KEYS = [['juin',5],['juil',6],['jan',0],['gen',0],['ene',0],['feb',1],['fev',1],['mar',2],['apr',3],['avr',3],['abr',3],
+  ['may',4],['mai',4],['mag',4],['jun',5],['giu',5],['jul',6],['lug',6],['aug',7],['aou',7],['ago',7],['sep',8],['set',8],
+  ['oct',9],['ott',9],['nov',10],['dec',11],['dic',11]];
+function isoWeekNum(d){
+  const u = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = u.getUTCDay() || 7;
+  u.setUTCDate(u.getUTCDate() + 4 - day);
+  return Math.ceil((((u - Date.UTC(u.getUTCFullYear(),0,1)) / 86400000) + 1) / 7);
+}
+// Parses a week date as it appears in the file ("17-Aug", "17 août", "17/08/2026", "2026-08-17", an Excel
+// serial). The usual export shows no year: we take the most recent year in which that day falls in the
+// week number written next to it.
+function parseFileDate(txt, weekNum){
+  const raw = String(txt==null?'':txt).trim();
+  if(!raw) return null;
+  let m;
+  if((m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return new Date(+m[1], +m[2]-1, +m[3]);
+  if(/^\d{5}$/.test(raw)){ const u = new Date(Date.UTC(1899,11,30) + (+raw)*86400000); return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate()); }
+  let day, month, year = null;
+  if((m = raw.match(/^(\d{1,2})[\/.](\d{1,2})(?:[\/.](\d{2,4}))?$/))){ day=+m[1]; month=+m[2]-1; if(m[3]) year=+m[3]; }
+  else if((m = raw.match(/^(\d{1,2})[\s\-\/.]*([^\d\s\-\/.,]+)[\s\-\/.,]*(\d{2,4})?$/))){
+    const name = m[2].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const hit = MONTH_KEYS.find(([k])=> name.startsWith(k));
+    if(!hit) return null;
+    day=+m[1]; month=hit[1]; if(m[3]) year=+m[3];
+  } else return null;
+  if(month<0 || month>11 || day<1 || day>31) return null;
+  if(year!==null) return new Date(year<100 ? 2000+year : year, month, day);
+  // A planning file is this week's export or an older one, never one from far in the future: take the
+  // most recent matching date that is not more than ~2 months ahead of today.
+  const latest = Date.now() + 60*86400000;
+  const thisYear = new Date().getFullYear();
+  let best=null, bestScore=Infinity;
+  for(let y=thisYear-12; y<=thisYear+1; y++){
+    const d = new Date(y, month, day);
+    if(d.getMonth()!==month || d.getTime()>latest) continue; // 29 Feb in a non-leap year, or too far ahead
+    const weekMatches = weekNum!=null && isoWeekNum(d)===weekNum;
+    const score = (latest - d.getTime()) + (weekMatches ? 0 : 1e15);
+    if(score<bestScore){ bestScore=score; best=d; }
+  }
+  return best;
+}
+function setFileCalendar(needMap){
+  state.calendar = null;
+  const first = needMap[Object.keys(needMap)[0]];
+  if(!first || !first.weeklyNeed.length) return;
+  const w0 = first.weeklyNeed[0];
+  const weekNum = extractWeekNum(w0.label);
+  const weekStart = parseFileDate(w0.date, weekNum);
+  if(!weekStart) return;
+  // Consumption week j is deducted at stock index j + weekOffset, i.e. that point is the stock at the
+  // close of week j, dated the following Monday.
+  const anchor = new Date(weekStart);
+  anchor.setDate(anchor.getDate() + (1 - (first.weekOffset||0))*7);
+  state.calendar = { anchor, weekStart, weekNum: weekNum!=null ? weekNum : isoWeekNum(weekStart) };
+}
+function stockDateObj(i){
+  const d = state.calendar ? new Date(state.calendar.anchor) : new Date();
+  d.setDate(d.getDate() + i*7);
+  return d;
+}
+// Date of stock point i (see FILE CALENDAR above).
+function stockDate(i){ return stockDateObj(i).toLocaleDateString(LOCALE(), {day:'2-digit', month:'short'}); }
+// A delivery that lands in stock point landIdx reached the plant during the week before that point's date.
+function plantArrivalDate(landIdx){ return stockDate(landIdx-1); }
+function ownerColor(name){
+  if(!name) return '#6b7480';
+  let hash=0; for(let i=0;i<name.length;i++) hash = name.charCodeAt(i) + ((hash<<5)-hash);
+  return OWNER_COLORS[Math.abs(hash) % OWNER_COLORS.length];
+}
+function initials(name){
+  if(!name) return '?';
+  return name.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+}
+function downloadCSV(filename, rows){
+  const csv = rows.map(r => r.map(c => {
+    const s = (c===null||c===undefined) ? '' : String(c);
+    return /[",;\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  }).join(';')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------------------------- FAMILY NORMALIZATION ---------------------------- */
+function normalizeFamilies(rawProject){
+  if(!rawProject) return ['Non catégorisé'];
+  const parts = rawProject.split('/').map(s=>s.trim()).filter(Boolean);
+  const out = new Set();
+  parts.forEach(p=>{
+    if(p==='0') out.add('Non catégorisé');
+    else out.add(p);
+  });
+  if(out.size===0) out.add('Non catégorisé');
+  return [...out];
+}
+
+/* ---------------------------- CSV PARSING ---------------------------- */
+function parseCSVText(text){
+  if(typeof Papa === 'undefined'){
+    throw new Error(t('err_csv_lib'));
+  }
+  return Papa.parse(text, { skipEmptyLines:false }).data;
+}
+
+function detectFileKind(rows){
+  for(let i=0;i<Math.min(rows.length,60);i++){
+    const row = rows[i] || [];
+    if(row.some(c => (c||'').trim()==='Appro') && row[0] && row[0].trim()==='PN') return 'master';
+    if(row.some(c => (c||'').trim()==='Material')) return 'openOrders';
+    if(row[0] && row[0].trim()==='PN' && row.some(c=>/^CW\s*\d+/i.test((c||'').trim()))) return 'need';
+  }
+  return null;
+}
+
+function extractWeekNum(label){
+  const m = String(label).match(/(\d+)\s*$/);
+  return m ? parseInt(m[1],10) : null;
+}
+function weekDiffMod(a,b){ // a-b, assuming a ~52-week annual cycle (handles year-end wraparound)
+  let d = a-b;
+  if(d>26) d-=52;
+  if(d<-26) d+=52;
+  return d;
+}
+
+function parseNeed(rows){
+  let headerIdx=-1;
+  for(let i=0;i<rows.length;i++){ if(rows[i][0] && rows[i][0].trim()==='PN'){ headerIdx=i; break; } }
+  if(headerIdx===-1) throw new Error(t('err_need_struct'));
+  const header = rows[headerIdx].map(c=>(c||'').trim());
+  const dateRow = rows[headerIdx-1] || [];
+  const cwCols=[];
+  header.forEach((hh,idx)=>{ if(/^CW\s*\d+/i.test(hh)) cwCols.push({idx,label:hh,date:(dateRow[idx]||'').trim()}); });
+  const rabenIdx = header.indexOf('Raben');
+  const statusIdx = header.indexOf('Status');
+  const allStockIdx = header.indexOf('All Stock');
+  const need14Idx = header.indexOf('Need Of 14 Weeks');
+  const allNeedIdx = header.indexOf('All Need');
+  const projCols=[];
+  if(rabenIdx>-1 && statusIdx>-1){
+    for(let idx=rabenIdx+1; idx<statusIdx; idx++){ if(isNumericStr(header[idx])) projCols.push({idx,label:header[idx].trim()}); }
+  }
+  // The consumption table (CW ...) and the stock-projection table don't always start on the same
+  // week: sometimes the consumption table starts one week later than the projection table (the
+  // projection's first column is then a pre-consumption baseline). We detect this from the actual
+  // week-number labels each time a file is loaded, rather than assuming either layout, so the app
+  // keeps working whichever convention that week's export uses.
+  let weekOffset = 0;
+  if(cwCols.length && projCols.length){
+    const cwFirst = extractWeekNum(cwCols[0].label);
+    const projFirst = extractWeekNum(projCols[0].label);
+    if(cwFirst!==null && projFirst!==null) weekOffset = weekDiffMod(cwFirst, projFirst);
+  }
+  const items={};
+  for(let r=headerIdx+1;r<rows.length;r++){
+    const row = rows[r];
+    if(!row || !row[0] || !row[0].trim()) continue;
+    const pn = row[0].trim();
+    // Only raw materials (PN starting with "1"): finished/semi-finished goods (starting with 5, U, Z…)
+    // aren't relevant to this tool and are dropped here.
+    if(pn[0]!=='1') continue;
+    const weeklyNeed = cwCols.map(c=>({label:c.label.trim(), date:c.date, value:parseFloat(row[c.idx])||0}));
+    const projection = projCols.map(c=>({label:c.label, value:parseFloat(row[c.idx])||0}));
+    const sumW = weeklyNeed.reduce((a,b)=>a+b.value,0);
+    const avgWeeklyNeed = weeklyNeed.length ? sumW/weeklyNeed.length : 0;
+    const allStock = allStockIdx>-1 ? (parseFloat(row[allStockIdx])||0) : 0;
+    const raben = rabenIdx>-1 ? (parseFloat(row[rabenIdx])||0) : 0;
+    // Note: the calendar's own baseline (first projection column) only counts stock physically at
+    // the plant: it excludes material already secured and sitting at Raben (in transit). We do NOT
+    // edit the calendar itself (it's the source of truth for rupture/overstock), but we track
+    // allStock+raben separately as "current stock" for display and coverage purposes, so it doesn't
+    // misleadingly read as 0 for items that are in fact covered.
+    items[pn] = {
+      pn, weeklyNeed, projection, weekOffset,
+      need14: need14Idx>-1 ? (parseFloat(row[need14Idx])||0) : 0,
+      allNeed: allNeedIdx>-1 ? (parseFloat(row[allNeedIdx])||0) : 0,
+      allStock, raben,
+      statusRaw: statusIdx>-1 ? (row[statusIdx]||'').trim() : '',
+      avgWeeklyNeed,
+    };
+  }
+  if(Object.keys(items).length===0) throw new Error(t('err_need_empty'));
+  return items;
+}
+
+function parseMaster(rows){
+  let headerIdx=-1;
+  for(let i=0;i<rows.length;i++){ if(rows[i][0] && rows[i][0].trim()==='PN' && rows[i].some(c=>(c||'').trim()==='Appro')){ headerIdx=i; break; } }
+  if(headerIdx===-1) throw new Error(t('err_master_struct'));
+  const header = rows[headerIdx].map(c=>(c||'').trim());
+  const col = n => header.indexOf(n);
+  const idx = {
+    pn:col('PN'), statusTag:col('Status'), sa:col('SA'), active:col('Active / No'), appro:col('Appro'),
+    supplierPn:col('Supplier PN'), cat:col('Cat'), supplier:col('supplier'), project:col('Project'),
+    supplierLoc:col('Supplier Location'), leadTime:col('Lead Time'), moq:col('MOQ'), lotSize:col('Lot Size'),
+    incoterm:col('Incoterm'), eta:col('ETA'), contact:col('Contact Person'), comment:col('Comment'), price:col('mm60'),
+  };
+  const items={};
+  const get = (row,i) => i>-1 ? (row[i]||'').trim() : '';
+  const getPrice = (row,i) => {
+    if(i<0 || !row[i]) return 0;
+    let cleaned = String(row[i]).replace(/€/g,'').replace(/\s/g,'').trim();
+    if(cleaned==='' || cleaned==='-') return 0;
+    const lastDot = cleaned.lastIndexOf('.'), lastComma = cleaned.lastIndexOf(',');
+    if(lastDot>-1 && lastComma>-1){
+      // both present: the last one is the decimal mark, the other groups thousands
+      cleaned = lastDot>lastComma ? cleaned.replace(/,/g,'') : cleaned.replace(/\./g,'').replace(',','.');
+    } else {
+      cleaned = cleaned.replace(',','.');
+    }
+    const v = parseFloat(cleaned);
+    return isNaN(v) ? 0 : v;
+  };
+  for(let r=headerIdx+1;r<rows.length;r++){
+    const row = rows[r];
+    if(!row || !get(row,idx.pn)) continue;
+    const pn = get(row,idx.pn);
+    items[pn] = {
+      pn, statusTag:get(row,idx.statusTag), sa:get(row,idx.sa), active:get(row,idx.active),
+      owner:get(row,idx.appro), supplierPn:get(row,idx.supplierPn), cat:get(row,idx.cat),
+      supplier:get(row,idx.supplier), project:get(row,idx.project), supplierLoc:get(row,idx.supplierLoc),
+      leadTime:get(row,idx.leadTime), moq:get(row,idx.moq), lotSize:get(row,idx.lotSize),
+      incoterm:get(row,idx.incoterm), eta:get(row,idx.eta), contact:get(row,idx.contact), comment:get(row,idx.comment),
+      price: getPrice(row,idx.price),
+    };
+  }
+  if(Object.keys(items).length===0) throw new Error(t('err_master_empty'));
+  return items;
+}
+
+function parseOpenOrders(rows){
+  let headerIdx=-1;
+  for(let i=0;i<rows.length;i++){ if(rows[i].some(c=>(c||'').trim()==='Material')){ headerIdx=i; break; } }
+  if(headerIdx===-1) throw new Error(t('err_oo_struct'));
+  const header = rows[headerIdx].map(c=>(c||'').trim());
+  const dateRow = rows[headerIdx-1] || [];
+  const materialIdx = header.indexOf('Material');
+  const saIdx = header.indexOf('SA');
+  const supplierIdx = header.indexOf('Supplier');
+  const backlogIdx = header.indexOf('Backlog');
+  const weekCols=[];
+  header.forEach((hh,idx)=>{ if(idx>backlogIdx && isNumericStr(hh)) weekCols.push({idx,label:hh.trim(),date:(dateRow[idx]||'').trim()}); });
+  const byPn={};
+  for(let r=headerIdx+1;r<rows.length;r++){
+    const row = rows[r];
+    if(!row || !row[materialIdx] || !row[materialIdx].trim()) continue;
+    const pn = row[materialIdx].trim();
+    const backlog = backlogIdx>-1 ? (parseFloat(row[backlogIdx])||0) : 0;
+    const weeks = weekCols.map(c=>({label:c.label,date:c.date,qty:parseFloat(row[c.idx])||0})).filter(w=>w.qty>0);
+    if(!byPn[pn]) byPn[pn]=[];
+    byPn[pn].push({ sa: saIdx>-1?(row[saIdx]||'').trim():'', supplier: supplierIdx>-1?(row[supplierIdx]||'').trim():'', backlog, weeks });
+  }
+  return byPn;
+}
+
+/* ---------------------------- BUILD DATASET ---------------------------- */
+// Rupture and overstock read the prevision calendar as-is (it already bakes in stock,
+// consumption and planned EDIs): nothing is reconstructed for those two.
+//
+// For the safety-stock check specifically, we simulate "what if every EDI lands 2 weeks
+// later than currently planned" using the real Open Orders data:
+//   1) Find where each EDI already sits in the calendar (matched by date to the Need week
+//      dates: the two files use different week-numbering conventions but the same calendar
+//      dates, so date-matching sidesteps that entirely) and remove it from that point on
+//      (the calendar is a running balance, so removing an arrival shifts everything after it
+//      down by that amount, until it's added back).
+//   2) Add the same quantity back in 2 weeks later than that.
+// If the resulting calendar dips below zero anywhere, the item doesn't have enough buffer to
+// absorb a 2-week EDI slip: that's what "sous stock de sécurité" means here.
+const RABEN_TO_PLANT_WEEKS = 1; // fixed business transit time, independent of file layout
+function buildEDIDelayCalendar(it, shiftWeeks){
+  const n = it.projection.length;
+  const dateToIndex = {};
+  const structOffset = it.weekOffset || 0; // detected per-file: how the consumption table's week 0 lines up with the projection table's week 0
+  it.weeklyNeed.forEach((w,j)=>{ if(w.date) dateToIndex[w.date] = j + structOffset + RABEN_TO_PLANT_WEEKS; });
+  const delta = new Array(n).fill(0);
+  (it.openOrders||[]).forEach(po=>{
+    po.weeks.forEach(w=>{
+      if(w.qty<=0) return;
+      const origIdx = dateToIndex[w.date];
+      if(origIdx===undefined || origIdx<0) return; // EDI dated outside the visible horizon, not in the calendar we can see
+      delta[origIdx] -= w.qty;
+      const newIdx = origIdx + shiftWeeks;
+      if(newIdx < n) delta[newIdx] += w.qty;
+      // if the delay pushes it past the visible horizon, it conservatively stays "not arrived"
+    });
+  });
+  const adjusted = new Array(n);
+  let cum = 0;
+  for(let i=0;i<n;i++){ cum += delta[i]; adjusted[i] = it.projection[i].value + cum; }
+  return adjusted;
+}
+
+/* ---------------------------- EDI PLANNER ----------------------------
+   Lets the user sketch new EDIs (one qty per EDI week) and see, live, whether the resulting
+   plan clears BOTH safety tests independently:
+     - transport: with all EDIs (existing + new) delayed by SETTINGS.safetyDelayWeeks, stock never < 0
+     - demand:    with EDIs on time, stock never < demandSpikeThreshold (2x peak near-term need)
+   The two are checked separately, never stacked: an item must survive one OR the other.
+   EDI weeks are expressed in the Open Orders convention (arrival at Raben); goods reach the plant
+   RABEN_TO_PLANT_WEEKS later, which is where they show up on the stock calendar.
+   ------------------------------------------------------------------------------------------- */
+function getEdiWeeks(it){
+  const n = it.projection.length;
+  const off = (it.weekOffset||0) + RABEN_TO_PLANT_WEEKS;
+  const out = [];
+  it.weeklyNeed.forEach((w,j)=>{
+    const landIdx = j + off;
+    if(landIdx < n) out.push({ j, date: w.date, label: w.label, landIdx });
+  });
+  return out;
+}
+
+function simulatePlan(it, qtyByJ){
+  const n = it.projection.length;
+  const off = (it.weekOffset||0) + RABEN_TO_PLANT_WEEKS;
+  const delay = SETTINGS.safetyDelayWeeks;
+  const baseDelta = new Array(n).fill(0), delayDelta = new Array(n).fill(0);
+  (qtyByJ||[]).forEach((q,j)=>{
+    if(!q || q<=0) return;
+    const k = j + off;
+    if(k < n) baseDelta[k] += q;
+    const kd = k + delay;
+    if(kd < n) delayDelta[kd] += q;
+  });
+  const origDelayed = buildEDIDelayCalendar(it, delay);
+  const baseline = new Array(n), delayed = new Array(n);
+  let cb = 0, cd = 0;
+  for(let i=0;i<n;i++){
+    cb += baseDelta[i]; cd += delayDelta[i];
+    baseline[i] = it.projection[i].value + cb;
+    delayed[i]  = origDelayed[i] + cd;
+  }
+  const threshold = it.demandSpikeThreshold || 0;
+  const weekStatus = [];
+  let firstFail = null, failCount = 0, unfixable = 0;
+  for(let i=0;i<n;i++){
+    const EPS = 1e-6; // float tolerance: cumulative sums vs. threshold can differ on the last decimal
+    const failDemand = baseline[i] < threshold - EPS;
+    const failTransport = delayed[i] < -EPS;
+    let s = 'ok';
+    if(baseline[i] < -EPS) s = 'rupture';
+    else if(failTransport) s = 'transport';
+    else if(failDemand) s = 'demand';
+    weekStatus.push(s);
+    if(s!=='ok'){
+      failCount++;
+      if(firstFail===null) firstFail = i;
+      // weeks that no new EDI can reach (before the first possible landing, or before the first
+      // possible delayed landing for a transport fail) are structurally unfixable from here
+      if(i < off || (s==='transport' && i < off + delay)) unfixable++;
+    }
+  }
+  const totalQty = (qtyByJ||[]).reduce((s,q)=>s+(q>0?q:0),0);
+  return { baseline, delayed, threshold, weekStatus, ok: failCount===0, firstFail, failCount, unfixable, totalQty };
+}
+
+// Pick a "round number" unit that matches how this item is usually ordered: one order of magnitude
+// under its peak weekly need (37k/week → order in 1 000s; 130k/week → 10 000s; 500/week → 10s).
+function niceUnitFor(it){
+  const peak = Math.max(...it.weeklyNeed.map(w=>w.value), it.avg||0, 1);
+  const mag = Math.pow(10, Math.max(1, Math.floor(Math.log10(peak)) - 1));
+  return Math.min(Math.max(mag, 10), 10000);
+}
+function roundUpTo(v, unit){ return unit>0 ? Math.ceil(v/unit - 1e-9)*unit : v; }
+
+// Greedy just-in-time minimum: walk EDI weeks in order; at each one, add exactly what's needed for
+// the constraint weeks that THIS EDI is the last one able to help (its own landing week for demand,
+// its own delayed-landing week for transport: plus everything to the horizon for the last EDI).
+// Adding at the last possible moment is what makes the total minimal. Optionally rounds each week's
+// qty up to `unit` before applying it, so the surplus carries forward (which naturally produces the
+// "20 000 · 0 · 0 · 20 000" cadence seen in the real EDIs).
+function computeMinPlan(it, unit, basePlan){
+  const n = it.projection.length;
+  const off = (it.weekOffset||0) + RABEN_TO_PLANT_WEEKS;
+  const delay = SETTINGS.safetyDelayWeeks;
+  const threshold = it.demandSpikeThreshold || 0;
+  const weeks = getEdiWeeks(it);
+  const baseline = it.projection.map(p=>p.value);
+  const delayed = buildEDIDelayCalendar(it, delay).slice();
+  // If the user already sketched some EDIs, bake them in first: the result is then "what's STILL
+  // missing per week on top of what you typed", which is what the live "+ à ajouter" hint shows.
+  if(basePlan){
+    basePlan.forEach((q,j)=>{
+      if(!q || q<=0) return;
+      const k = j + off, kd = k + delay;
+      for(let i=k;i<n;i++) baseline[i] += q;
+      for(let i=kd;i<n;i++) delayed[i] += q;
+    });
+  }
+  const plan = new Array(it.weeklyNeed.length).fill(0);
+  const lastJ = weeks.length ? weeks[weeks.length-1].j : -1;
+  // last EDI whose delayed landing is still inside the horizon
+  let lastDelayJ = -1;
+  weeks.forEach(w=>{ if(w.landIdx + delay < n) lastDelayJ = w.j; });
+  weeks.forEach(w=>{
+    const k = w.landIdx, kd = k + delay;
+    let need = 0;
+    // demand constraint: this EDI is the last helper for its landing week (or the whole tail if last)
+    const baseTo = (w.j===lastJ) ? n : Math.min(n, k+1);
+    for(let i=k;i<baseTo;i++){ need = Math.max(need, threshold - baseline[i]); }
+    // transport constraint: last helper for its delayed landing week (or the whole tail if last-with-delay)
+    if(kd < n){
+      const delTo = (w.j===lastDelayJ) ? n : Math.min(n, kd+1);
+      for(let i=kd;i<delTo;i++){ need = Math.max(need, 0 - delayed[i]); }
+    }
+    let q = need > 1e-9 ? need + 1e-6 : 0; // tiny bump so we land strictly above the line, not on it
+    if(q>0 && unit) q = roundUpTo(q, unit);
+    if(q>0){
+      plan[w.j] = q;
+      for(let i=k;i<n;i++) baseline[i] += q;
+      for(let i=kd;i<n;i++) delayed[i] += q;
+    }
+  });
+  return plan;
+}
+
+function categorize(it){
+  const avg = it.avgWeeklyNeed;
+  const current = it.allStock + (it.raben||0); // stock actuel = à l'usine + déjà sécurisé au Raben
+  const price = it.price || 0;
+  // Value of stock sitting in the calendar, summed across the whole 36-week horizon (not just a
+  // snapshot): a big number here means either a lot of money per unit, or units sitting for a long
+  // time, or both. That's what "surstock" is meant to catch: capital immobilized, not just a peak week.
+  const overstockValue = it.projection.reduce((s,p)=> s + Math.max(0,p.value), 0) * price;
+  if(avg <= 0){
+    const category = current>0 ? (overstockValue>SETTINGS.overstockValueThreshold ? 'OVERSTOCK' : 'SWEET_SPOT') : 'INACTIVE';
+    return {
+      category, weeksToRupture:null, overstockValue, coverageNow: current>0?Infinity:0, current, avg, delayedStock:null,
+      farRupture:false, weeksToUnderSafetyTransport:null, farUnderSafetyTransport:false,
+      weeksToUnderSafetyDemand:null, farUnderSafetyDemand:false, demandSpikeThreshold:0,
+    };
+  }
+  // 1) Rupture: does the calendar, exactly as planned, ever go negative? (strictly < 0: reaching
+  //    exactly 0 is "just enough", not a rupture; matches how the source file's own status is set)
+  let weeksToRupture=null;
+  for(let i=0;i<it.projection.length;i++){ if(it.projection[i].value<0){ weeksToRupture=i; break; } }
+
+  // Only a rupture within the near-term horizon (default 12 weeks / ~3 months) counts as urgent.
+  // A rupture further out than that isn't actionable right now: file it under "zone saine" instead,
+  // flagged so it's still visible, rather than crowding the urgent list with things 6+ months away.
+  const nearRupture = weeksToRupture!==null && weeksToRupture<=SETTINGS.ruptureHorizonWeeks;
+  const farRupture = weeksToRupture!==null && weeksToRupture>SETTINGS.ruptureHorizonWeeks;
+
+  // 2a) Safety-stock risk: TRANSPORT: EDIs delayed by SETTINGS.safetyDelayWeeks (via the real
+  //     Open Orders data). Only worth checking if the baseline plan has NO rupture anywhere in the
+  //     visible horizon: a far rupture (>12 weeks) already tells us there's a known future issue;
+  //     running the delay test on top of that would just relabel it instead of surfacing it cleanly
+  //     as "rupture lointaine" under zone saine.
+  let weeksToUnderSafetyTransport=null, delayedStock=null;
+  if(weeksToRupture===null){
+    delayedStock = buildEDIDelayCalendar(it, SETTINGS.safetyDelayWeeks);
+    for(let i=0;i<delayedStock.length;i++){ if(delayedStock[i]<0){ weeksToUnderSafetyTransport=i; break; } }
+  }
+  const nearUSTransport = weeksToUnderSafetyTransport!==null && weeksToUnderSafetyTransport<=SETTINGS.ruptureHorizonWeeks;
+  const farUSTransport = weeksToUnderSafetyTransport!==null && weeksToUnderSafetyTransport>SETTINGS.ruptureHorizonWeeks;
+
+  // 2b) Safety-stock risk: DEMAND: could the item absorb a sudden demand spike, at any week, worth
+  //     2x the heaviest week of consumption expected over the next N weeks? Threshold = 2x the peak
+  //     weekly need over that near-term window; flagged if the planned stock ever dips under it.
+  //     Only checked for items that clear the rupture AND transport-delay tests, so each item lands
+  //     in exactly one category.
+  // 2b) Safety-stock risk: DEMAND: could the item absorb a sudden demand spike, at any week, worth
+  //     2x the heaviest week of consumption expected over the next N weeks? Threshold = 2x the peak
+  //     weekly need over that near-term window. Always computed (used as a reference line on the
+  //     chart even for items classified elsewhere): only used for CATEGORY assignment when the item
+  //     clears the rupture and transport-delay tests, so each item still lands in exactly one category.
+  const nearWeeks = it.weeklyNeed.slice(0, SETTINGS.ruptureHorizonWeeks);
+  const peakNearNeed = nearWeeks.length ? Math.max(...nearWeeks.map(w=>w.value)) : 0;
+  const demandSpikeThreshold = SETTINGS.demandSpikeMultiplier * peakNearNeed;
+  let weeksToUnderSafetyDemand=null;
+  if(weeksToRupture===null && !nearUSTransport && !farUSTransport && demandSpikeThreshold>0){
+    for(let i=0;i<it.projection.length;i++){ if(it.projection[i].value<demandSpikeThreshold){ weeksToUnderSafetyDemand=i; break; } }
+  }
+  const nearUSDemand = weeksToUnderSafetyDemand!==null && weeksToUnderSafetyDemand<=SETTINGS.ruptureHorizonWeeks;
+  const farUSDemand = weeksToUnderSafetyDemand!==null && weeksToUnderSafetyDemand>SETTINGS.ruptureHorizonWeeks;
+
+  const coverageNow = current/avg;
+  let category;
+  if(nearRupture) category='RUPTURE';
+  else if(farRupture) category='SWEET_SPOT';
+  else if(nearUSTransport) category='UNDER_SAFETY_TRANSPORT';
+  else if(farUSTransport) category='SWEET_SPOT';
+  else if(nearUSDemand) category='UNDER_SAFETY_DEMAND';
+  else if(farUSDemand) category='SWEET_SPOT';
+  else if(overstockValue>SETTINGS.overstockValueThreshold) category='OVERSTOCK';
+  else category='SWEET_SPOT';
+  return {
+    category, weeksToRupture, overstockValue, coverageNow, current, avg, delayedStock,
+    farRupture,
+    weeksToUnderSafetyTransport, farUnderSafetyTransport: farUSTransport,
+    weeksToUnderSafetyDemand, farUnderSafetyDemand: farUSDemand, demandSpikeThreshold,
+  };
+}
+
+function buildDataset(needMap, masterMap, ooMap){
+  const items=[];
+  for(const pn in needMap){
+    const need = needMap[pn];
+    const master = masterMap[pn] || {};
+    const openOrders = ooMap[pn] || [];
+    const totalIncoming = openOrders.reduce((s,po)=> s + po.weeks.reduce((a,w)=>a+w.qty,0), 0);
+    const calc = categorize({ projection: need.projection, weeklyNeed: need.weeklyNeed, avgWeeklyNeed: need.avgWeeklyNeed, allStock: need.allStock, raben: need.raben, price: master.price, weekOffset: need.weekOffset, openOrders });
+    items.push({
+      pn,
+      owner: master.owner || 'Non assigné',
+      families: normalizeFamilies(master.project),
+      projectDetail: master.project || '',
+      statusCategory: master.statusTag || '',
+      supplier: master.supplier || need.supplier || '-',
+      cat: master.cat || '',
+      active: master.active || '',
+      sa: master.sa || '',
+      supplierPn: master.supplierPn || '',
+      supplierLoc: master.supplierLoc || '',
+      leadTime: master.leadTime || '',
+      moq: master.moq || '',
+      lotSize: master.lotSize || '',
+      incoterm: master.incoterm || '',
+      eta: master.eta || '',
+      contact: master.contact || '',
+      comment: master.comment || '',
+      price: master.price || 0,
+      weeklyNeed: need.weeklyNeed,
+      weekOffset: need.weekOffset,
+      projection: need.projection,
+      allStock: need.allStock,
+      raben: need.raben,
+      current: calc.current,
+      avg: calc.avg,
+      category: calc.category,
+      weeksToRupture: calc.weeksToRupture,
+      weeksToUnderSafetyTransport: calc.weeksToUnderSafetyTransport,
+      weeksToUnderSafetyDemand: calc.weeksToUnderSafetyDemand,
+      demandSpikeThreshold: calc.demandSpikeThreshold,
+      coverageNow: calc.coverageNow,
+      overstockValue: calc.overstockValue,
+      farRupture: calc.farRupture,
+      farUnderSafetyTransport: calc.farUnderSafetyTransport,
+      farUnderSafetyDemand: calc.farUnderSafetyDemand,
+      openOrders, totalIncoming,
+    });
+  }
+  // items present in master but absent from need (no forecast): keep as separate pool, not in main categories
+  const noForecast=[];
+  for(const pn in masterMap){
+    if(needMap[pn]) continue;
+    if(pn[0]!=='1') continue; // same raw-materials-only filter as Need: skip finished/semi-finished goods
+    const master = masterMap[pn];
+    noForecast.push({ pn, owner: master.owner||'Non assigné', families: normalizeFamilies(master.project), supplier: master.supplier||'-', active: master.active||'' });
+  }
+  return { items, noForecast };
+}
+
+/* ---------------------------- APP INIT / EVENTS ---------------------------- */
+function setState(patch){ Object.assign(state, patch); render(); }
+
+function findSheetByKeywords(workbook, keywords){
+  const names = workbook.SheetNames;
+  for(const kw of keywords){
+    const exact = names.find(n => n.trim().toLowerCase() === kw);
+    if(exact) return exact;
+  }
+  for(const kw of keywords){
+    const partial = names.find(n => n.trim().toLowerCase().includes(kw));
+    if(partial) return partial;
+  }
+  return null;
+}
+
+// Reads the three sheets of a workbook into state.files. Returns false (with state.parseError set) on failure.
+function loadWorkbook(data, displayName){
+  try{
+    const workbook = XLSX.read(data, { type:'array', cellDates:false });
+    const sheetMap = {
+      need: findSheetByKeywords(workbook, ['need']),
+      master: findSheetByKeywords(workbook, ['new r', 'new_r', 'newr']),
+      openOrders: findSheetByKeywords(workbook, ['open orders', 'open_orders', 'openorders']),
+    };
+    const missing = Object.entries(sheetMap).filter(([k,v])=>!v);
+    if(missing.length){
+      const labels = { need:'Need', master:'New R', openOrders:'Open Orders' };
+      state.parseError = t('err_sheets_missing', missing.map(([k])=>labels[k]).join(', '), workbook.SheetNames.join(', '));
+      return false;
+    }
+    Object.entries(sheetMap).forEach(([kind, sheetName])=>{
+      // Master data is read with raw numbers: the price column (mm60) is displayed with one decimal
+      // in Excel, so its formatted text would turn a 0.04 € part into "0.0". The two other sheets keep
+      // formatted text because their week dates ("17-Aug") are matched across sheets and shown as is.
+      const csvText = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName], { blankrows:true, rawNumbers: kind==='master' });
+      const rows = parseCSVText(csvText);
+      state.files[kind] = rows;
+      state.fileMeta[kind] = { name: `${displayName} → ${sheetName}`, size: csvText.length };
+    });
+    state.parseError = null;
+    return true;
+  } catch(err){
+    state.parseError = t('err_xlsx_read', displayName, err.message);
+    return false;
+  }
+}
+
+function handleExcelFile(file){
+  if(typeof XLSX === 'undefined'){
+    state.parseError = t('err_xlsx_lib');
+    render();
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => { loadWorkbook(new Uint8Array(e.target.result), file.name); render(); };
+  reader.readAsArrayBuffer(file);
+}
+
+/* Demo: loads the synthetic sample shipped next to this page and goes straight to the app.
+   Needs the page to be served over http(s) (GitHub Pages, any static server): browsers don't let a
+   page opened from disk fetch a neighbouring file. Also triggered by adding ?demo to the URL. */
+const DEMO_FILE = 'sample-data/supply_management_34-2026_sample.xlsx';
+function loadDemo(){
+  if(state.demoLoading) return;
+  if(typeof XLSX === 'undefined'){ setState({ parseError: t('err_xlsx_lib') }); return; }
+  setState({ demoLoading:true, parseError:null });
+  fetch(DEMO_FILE)
+    .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.arrayBuffer(); })
+    .then(buf => {
+      state.demoLoading = false;
+      if(loadWorkbook(new Uint8Array(buf), DEMO_FILE.split('/').pop())){ state.demo = true; proceedFromUpload(); }
+      else render();
+    })
+    .catch(() => setState({ demoLoading:false, parseError: t('err_demo_load', DEMO_FILE) }));
+}
+
+function handleFiles(fileList){
+  const all = Array.from(fileList);
+  const excelFiles = all.filter(f => /\.(xlsx|xls)$/i.test(f.name));
+  const csvFiles = all.filter(f => /\.csv$/i.test(f.name));
+  state.parseError = null;
+  state.demo = false;
+  excelFiles.forEach(f => handleExcelFile(f));
+  if(csvFiles.length===0) return;
+  let pending = csvFiles.length;
+  csvFiles.forEach(f => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try{
+        const rows = parseCSVText(e.target.result);
+        const kind = detectFileKind(rows);
+        if(!kind){
+          state.parseError = t('err_file_unknown', f.name);
+        } else {
+          state.files[kind] = rows;
+          state.fileMeta[kind] = { name: f.name, size: f.size };
+        }
+      } catch(err){
+        state.parseError = t('err_file_read', f.name, err.message);
+      }
+      pending--;
+      if(pending===0) render();
+    };
+    reader.readAsText(f, 'UTF-8');
+  });
+}
+
+function proceedFromUpload(){
+  try{
+    const needMap = parseNeed(state.files.need);
+    const masterMap = parseMaster(state.files.master);
+    const ooMap = parseOpenOrders(state.files.openOrders);
+    const { items, noForecast } = buildDataset(needMap, masterMap, ooMap);
+    setFileCalendar(needMap);
+    const owners = [...new Set(items.map(i=>i.owner).filter(o=>o && o!=='Non assigné'))].sort();
+    setState({ screen:'user', items, noForecast, owners, parseError:null });
+  } catch(err){
+    setState({ parseError: t('err_processing', err.message) });
+  }
+}
+
+function recomputeCategories(){
+  state.items.forEach(it=>{
+    const calc = categorize({ projection: it.projection, weeklyNeed: it.weeklyNeed, avgWeeklyNeed: it.avg, allStock: it.allStock, raben: it.raben, price: it.price, weekOffset: it.weekOffset, openOrders: it.openOrders });
+    it.category = calc.category;
+    it.weeksToRupture = calc.weeksToRupture;
+    it.weeksToUnderSafetyTransport = calc.weeksToUnderSafetyTransport;
+    it.weeksToUnderSafetyDemand = calc.weeksToUnderSafetyDemand;
+    it.demandSpikeThreshold = calc.demandSpikeThreshold;
+    it.coverageNow = calc.coverageNow;
+    it.overstockValue = calc.overstockValue;
+    it.farRupture = calc.farRupture;
+    it.farUnderSafetyTransport = calc.farUnderSafetyTransport;
+    it.farUnderSafetyDemand = calc.farUnderSafetyDemand;
+  });
+}
+
+/* ---------------------------- FILTERING / SORTING ---------------------------- */
+function getFilteredItems(){
+  if(state.category==='NO_FORECAST'){
+    let arr = state.noForecast;
+    if(state.scope==='mine' && state.currentOwner) arr = arr.filter(i=>i.owner===state.currentOwner);
+    if(state.familyFilter.size>0) arr = arr.filter(i=> i.families.some(f=>state.familyFilter.has(f)));
+    if(state.supplierFilter) arr = arr.filter(i=> i.supplier===state.supplierFilter);
+    if(state.search.trim()){
+      const q = state.search.trim().toLowerCase();
+      arr = arr.filter(i => i.pn.toLowerCase().includes(q) || i.supplier.toLowerCase().includes(q));
+    }
+    return arr.slice().sort((a,b)=> a.pn.localeCompare(b.pn));
+  }
+  let arr = state.items;
+  if(state.scope==='mine' && state.currentOwner){
+    arr = arr.filter(i=>i.owner===state.currentOwner);
+  }
+  if(state.category!=='ALL'){
+    arr = arr.filter(i=>i.category===state.category);
+  }
+  if(state.familyFilter.size>0){
+    arr = arr.filter(i=> i.families.some(f=>state.familyFilter.has(f)));
+  }
+  if(state.supplierFilter){
+    arr = arr.filter(i=> i.supplier===state.supplierFilter);
+  }
+  if(state.search.trim()){
+    const q = state.search.trim().toLowerCase();
+    arr = arr.filter(i => i.pn.toLowerCase().includes(q) || i.supplier.toLowerCase().includes(q) || i.projectDetail.toLowerCase().includes(q));
+  }
+  const catPriority = { RUPTURE:0, UNDER_SAFETY_TRANSPORT:1, UNDER_SAFETY_DEMAND:2, OVERSTOCK:3, SWEET_SPOT:4, INACTIVE:5 };
+  arr = arr.slice().sort((a,b)=>{
+    if(state.category==='ALL'){
+      if(a.category!==b.category) return (catPriority[a.category]??9) - (catPriority[b.category]??9);
+      if(a.category==='RUPTURE') return (a.weeksToRupture-b.weeksToRupture) || (b.avg-a.avg);
+      if(a.category==='UNDER_SAFETY_TRANSPORT') return (a.weeksToUnderSafetyTransport-b.weeksToUnderSafetyTransport) || (b.avg-a.avg);
+      if(a.category==='UNDER_SAFETY_DEMAND') return (a.weeksToUnderSafetyDemand-b.weeksToUnderSafetyDemand) || (b.avg-a.avg);
+      if(a.category==='OVERSTOCK') return b.overstockValue - a.overstockValue;
+      return b.current - a.current;
+    }
+    if(state.category==='RUPTURE') return (a.weeksToRupture-b.weeksToRupture) || (b.avg-a.avg);
+    if(state.category==='UNDER_SAFETY_TRANSPORT') return (a.weeksToUnderSafetyTransport-b.weeksToUnderSafetyTransport) || (b.avg-a.avg);
+    if(state.category==='UNDER_SAFETY_DEMAND') return (a.weeksToUnderSafetyDemand-b.weeksToUnderSafetyDemand) || (b.avg-a.avg);
+    if(state.category==='OVERSTOCK') return b.overstockValue - a.overstockValue;
+    if(state.category==='SWEET_SPOT'){
+      const aFlag = a.farRupture || a.farUnderSafetyTransport || a.farUnderSafetyDemand;
+      const bFlag = b.farRupture || b.farUnderSafetyTransport || b.farUnderSafetyDemand;
+      if(aFlag !== bFlag) return aFlag ? -1 : 1;
+      if(aFlag && bFlag){
+        const aW = a.farRupture ? a.weeksToRupture : (a.farUnderSafetyTransport ? a.weeksToUnderSafetyTransport : a.weeksToUnderSafetyDemand);
+        const bW = b.farRupture ? b.weeksToRupture : (b.farUnderSafetyTransport ? b.weeksToUnderSafetyTransport : b.weeksToUnderSafetyDemand);
+        return aW - bW;
+      }
+      return b.current - a.current;
+    }
+    return b.current - a.current;
+  });
+  return arr;
+}
+
+function scopedItemsForCounts(){
+  return state.scope==='mine' && state.currentOwner ? state.items.filter(i=>i.owner===state.currentOwner) : state.items;
+}
+
+function getSupplierList(){
+  const set = new Set();
+  scopedItemsForCounts().forEach(i=>{ if(i.supplier && i.supplier!=='-') set.add(i.supplier); });
+  return [...set].sort((a,b)=>a.localeCompare(b));
+}
+
+function getFamilyList(){
+  const set = new Set();
+  scopedItemsForCounts().forEach(i=>i.families.forEach(f=>set.add(f)));
+  const arr = [...set].sort((a,b)=>{
+    if(a==='Non catégorisé') return 1;
+    if(b==='Non catégorisé') return -1;
+    return a.localeCompare(b);
+  });
+  return arr;
+}
+
+/* ---------------------------- RENDER: ROOT ---------------------------- */
+function render(){
+  const root = document.getElementById('app');
+  if(state.screen==='upload') root.innerHTML = renderUpload();
+  else if(state.screen==='user') root.innerHTML = renderUserSelect();
+  else if(state.screen==='overview') root.innerHTML = renderOverview();
+  else root.innerHTML = renderDashboard();
+  attachHandlers();
+  if(state.screen==='dashboard' && state.drawerItem) renderDrawerChart();
+}
+
+/* ---------------------------- RENDER: UPLOAD ---------------------------- */
+function fcStatus(kind, label){
+  const meta = state.fileMeta[kind];
+  const ok = !!meta;
+  return h`
+    <div class="filecheck ${ok?'ok':''}">
+      <div class="fc-top">
+        <span class="status-icon" style="color:${ok?'var(--green)':'var(--text-faint)'}">${ok?ICONS.check:ICONS.box}</span>
+        ${esc(label)}
+      </div>
+      <div class="fc-name">${ok? esc(meta.name) : t('fc_waiting')}</div>
+    </div>`;
+}
+
+function renderUpload(){
+  const allReady = state.files.need && state.files.master && state.files.openOrders;
+  return h`
+    <div id="app-inner" style="display:flex; flex-direction:column; min-height:100vh;">
+    <div class="screen-center">
+      <div class="upload-card">
+        <div class="brand-row" style="position:relative;">
+          <div class="brand-mark">${ICONS.logo}</div>
+          <div>
+            <div class="brand-name">ANDON</div>
+            <div class="brand-sub">${t('brand_sub')}</div>
+          </div>
+          <div style="position:absolute; top:0; right:0;">${renderLangSwitcher()}</div>
+        </div>
+        <p class="upload-intro">${t('upload_intro')}</p>
+        <div class="dropzone" id="dropzone">
+          <div class="dz-icon">${ICONS.upload}</div>
+          <div class="dz-title">${t('dz_title')}</div>
+          <div class="dz-sub">${t('dz_sub')}</div>
+          <input type="file" id="fileInput" multiple accept=".csv,.xlsx,.xls">
+        </div>
+        <div class="filechecks">
+          ${fcStatus('need',t('fc_need'))}
+          ${fcStatus('master',t('fc_master'))}
+          ${fcStatus('openOrders',t('fc_oo'))}
+        </div>
+        ${state.parseError ? `<div class="upload-error">${esc(state.parseError)}</div>` : ''}
+        <div class="upload-actions">
+          <button class="btn primary" id="btnContinue" ${allReady?'':'disabled'}>${t('btn_continue')}</button>
+        </div>
+        <div class="demo-box">
+          <div class="demo-text">
+            <div class="demo-title">${t('demo_title')}</div>
+            <div class="demo-note">${t('demo_note')}</div>
+          </div>
+          <button class="btn" id="btnDemo" ${state.demoLoading?'disabled':''}>${state.demoLoading?t('demo_loading'):t('demo_btn')}</button>
+        </div>
+      </div>
+    </div>
+    </div>`;
+}
+
+/* ---------------------------- RENDER: USER SELECT ---------------------------- */
+function renderUserSelect(){
+  const counts = {};
+  state.items.forEach(i=>{ counts[i.owner]=(counts[i.owner]||0)+1; });
+  return h`
+    <div class="screen-center">
+      <div class="userselect-wrap" style="position:relative;">
+        <div style="position:absolute; top:0; right:0;">${renderLangSwitcher()}</div>
+        <div class="eyebrow">${t('step22')}</div>
+        <h2 style="font-size:24px; margin-top:8px;">${t('who_are_you')}</h2>
+        <p style="color:var(--text-dim); font-size:13px; margin-top:8px;">${t('userselect_intro')}</p>
+        ${state.demo ? `<p class="demo-line">${t('demo_userselect')}</p>` : ''}
+        <div class="avatar-grid">
+          ${state.owners.map(o => h`
+            <button class="avatar-tile" data-owner="${esc(o)}">
+              <div class="avatar-circle" style="background:${ownerColor(o)}">${esc(initials(o))}</div>
+              <div class="a-name">${esc(o)}</div>
+              <div class="a-count">${counts[o]||0} ${(counts[o]||0)>1?t('ref_many'):t('ref_one')}</div>
+            </button>`).join('')}
+        </div>
+        <button class="team-link" id="btnTeamView">${t('see_team')}</button>
+      </div>
+    </div>`;
+}
+
+/* ---------------------------- RENDER: DASHBOARD ---------------------------- */
+// Week shown in the top bar: the file's own week (the one every date and delay is counted from),
+// plus a badge when the demo is loaded or when the file isn't the current week's export.
+function weekLabel(){
+  const cal = state.calendar;
+  if(!cal){
+    const d = new Date();
+    return esc(t('week_label', isoWeekNum(d), d.toLocaleDateString(LOCALE(),{weekday:'short', day:'2-digit', month:'long'})));
+  }
+  const dateTxt = cal.weekStart.toLocaleDateString(LOCALE(),{day:'numeric', month:'long', year:'numeric'});
+  const label = esc(t('week_label', cal.weekNum, dateTxt));
+  if(state.demo) return `${label}<span class="tb-badge demo" title="${esc(t('demo_badge_tt', cal.weekNum))}">${esc(t('demo_badge'))}</span>`;
+  const ageDays = (new Date() - cal.weekStart) / 86400000;
+  if(ageDays > 13 || ageDays < -7) return `${label}<span class="tb-badge stale" title="${esc(t('stale_tt', dateTxt))}">${esc(t('stale_tag'))}</span>`;
+  return label;
+}
+
+function renderTopbar(){
+  const scoped = scopedItemsForCounts();
+  return h`
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="brand-mark">${ICONS.logo}</div>
+      <div class="tb-title">ANDON</div>
+      <div class="tb-week">${weekLabel()}</div>
+    </div>
+    <div class="topbar-right">
+      ${renderLangSwitcher()}
+      <button class="icon-btn" id="btnOverview" title="${t('tt_overview')}">${ICONS.chart}</button>
+      <div class="rel">
+        <button class="icon-btn" id="btnSettings" title="${t('tt_settings')}">${ICONS.settings}</button>
+        ${state.settingsOpen ? renderSettingsPop() : ''}
+      </div>
+      <button class="icon-btn" id="btnExport" title="${t('tt_export')}">${ICONS.download}</button>
+      <div class="rel">
+        <div class="user-chip" id="btnUserMenu">
+          ${state.currentOwner ? h`<div class="avatar-circle" style="background:${ownerColor(state.currentOwner)}">${esc(initials(state.currentOwner))}</div><span class="u-name">${esc(state.currentOwner)}</span>`
+                                : h`<div class="avatar-circle" style="background:#6b7480">${ICONS.team}</div><span class="u-name">${t('team')}</span>`}
+          <span style="color:var(--text-faint); display:flex;">${ICONS.chevDown}</span>
+        </div>
+        ${state.userMenuOpen ? renderUserMenu() : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderUserMenu(){
+  return h`
+    <div class="user-menu">
+      ${state.owners.map(o=> h`
+        <button data-switch-owner="${esc(o)}">
+          <span class="um-avatar" style="background:${ownerColor(o)}">${esc(initials(o))}</span> ${esc(o)}
+        </button>`).join('')}
+      <hr>
+      <button data-switch-owner="__team__">
+        <span class="um-avatar" style="background:#6b7480">${ICONS.team}</span> ${t('team_view_all')}
+      </button>
+    </div>`;
+}
+
+function renderSettingsPop(){
+  return h`
+    <div class="settings-pop">
+      <label>${t('set_horizon')}</label>
+      <input type="number" id="setRuptureHorizon" min="1" step="1" value="${SETTINGS.ruptureHorizonWeeks}">
+      <label>${t('set_delay')}</label>
+      <input type="number" id="setSafety" min="0" step="0.5" value="${SETTINGS.safetyDelayWeeks}">
+      <label>${t('set_spike')}</label>
+      <input type="number" id="setDemandSpike" min="1" step="0.5" value="${SETTINGS.demandSpikeMultiplier}">
+      <label>${t('set_overstock')}</label>
+      <input type="number" id="setOverstock" min="0" step="50000" value="${SETTINGS.overstockValueThreshold}">
+      <div class="sp-note">${t('set_note')}</div>
+    </div>`;
+}
+
+/* ---------------------------- CATEGORY EXPLAINERS ("i" popovers) ---------------------------- */
+function infoContent(cat){
+  const D = SETTINGS.safetyDelayWeeks, O = fmtEur(SETTINGS.overstockValueThreshold), H = SETTINGS.ruptureHorizonWeeks, M2 = SETTINGS.demandSpikeMultiplier;
+  const M = {
+    RUPTURE: { formula:t('if_rupture_f', H), text:t('if_rupture_t', H) },
+    UNDER_SAFETY_TRANSPORT: { formula:t('if_t_f', D, H), text:t('if_t_t', D, H) },
+    UNDER_SAFETY_DEMAND: { formula:t('if_d_f', M2, H), text:t('if_d_t', H, M2) },
+    OVERSTOCK: { formula:t('if_o_f', O), text:t('if_o_t') },
+    SWEET_SPOT: { formula:t('if_s_f'), text:t('if_s_t', H) },
+    INACTIVE: { formula:t('if_i_f'), text:t('if_i_t') },
+  };
+  return M[cat] || { formula:'', text:'' };
+}
+function renderInfoPop(cat){
+  const info = infoContent(cat);
+  return h`
+    <div class="info-pop">
+      <div class="ip-formula">${esc(info.formula)}</div>
+      <div class="ip-text">${esc(info.text)}</div>
+    </div>`;
+}
+
+function renderAndonRow(){
+  const scoped = scopedItemsForCounts();
+  const counts = {}; CATEGORY_ORDER.forEach(c=>counts[c]=0);
+  scoped.forEach(i=>{ if(counts[i.category]!==undefined) counts[i.category]++; });
+  const subtitles = {
+    RUPTURE: t('sub_rupture', SETTINGS.ruptureHorizonWeeks),
+    UNDER_SAFETY_TRANSPORT: t('sub_transport', SETTINGS.safetyDelayWeeks, SETTINGS.ruptureHorizonWeeks),
+    UNDER_SAFETY_DEMAND: t('sub_demand', SETTINGS.demandSpikeMultiplier, SETTINGS.ruptureHorizonWeeks),
+    OVERSTOCK: t('sub_overstock', fmtEur(SETTINGS.overstockValueThreshold)),
+    SWEET_SPOT: t('sub_sweet'),
+  };
+  return h`
+    <div class="andon-row">
+      ${CATEGORY_ORDER.map(cat=>{
+        const meta = COLORS[cat];
+        const active = state.category===cat;
+        const pulse = cat==='RUPTURE' && counts[cat]>0;
+        return h`
+        <button class="andon-tile ${active?'active':''} ${pulse?'pulse':''}" data-category="${cat}" style="color:${meta.hex}">
+          <div class="at-top">
+            <span class="at-light" style="background:${meta.hex}"></span>
+            <span class="info-btn" data-info="${cat}" title="${t('info_how')}">i</span>
+          </div>
+          <div class="at-count" style="color:var(--text)">${counts[cat]}</div>
+          <div class="at-label" style="color:${meta.hex}">${t('cat_'+cat)}</div>
+          <div class="at-sub">${subtitles[cat]}</div>
+          ${state.infoOpen===cat ? renderInfoPop(cat) : ''}
+        </button>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderSecondaryRow(){
+  const scoped = state.scope==='mine' && state.currentOwner ? null : null;
+  const inactiveCount = scopedItemsForCounts().filter(i=>i.category==='INACTIVE').length;
+  const noForecastCount = state.scope==='mine' && state.currentOwner
+    ? state.noForecast.filter(i=>i.owner===state.currentOwner).length
+    : state.noForecast.length;
+  return h`
+    <div class="secondary-row">
+      <div class="sec-chip ${state.category==='INACTIVE'?'active':''}" data-category="INACTIVE" style="cursor:pointer;">
+        <span class="dot" style="background:${COLORS.INACTIVE.hex}"></span>
+        ${t('cat_INACTIVE')} <b>${inactiveCount}</b>
+      </div>
+      <div class="sec-chip ${state.category==='NO_FORECAST'?'active':''}" data-category="NO_FORECAST" style="cursor:pointer;" title="${t('tt_noforecast')}">
+        <span class="dot" style="background:var(--text-faint)"></span>
+        ${t('no_forecast')} <b>${noForecastCount}</b>
+      </div>
+    </div>`;
+}
+
+function renderFilterBar(){
+  const families = getFamilyList();
+  const suppliers = getSupplierList();
+  return h`
+    <div class="filterbar">
+      <input class="search-input" id="searchInput" placeholder="${t('search_ph')}" value="${esc(state.search)}">
+      <select class="supplier-select" id="supplierSelect">
+        <option value="">${t('all_suppliers')}</option>
+        ${suppliers.map(s=> h`<option value="${esc(s)}" ${state.supplierFilter===s?'selected':''}>${esc(s)}</option>`).join('')}
+      </select>
+      <div class="chip-scroll">
+        ${families.map(f=> h`<button class="fam-chip ${state.familyFilter.has(f)?'on':''}" data-family="${esc(f)}">${esc(famLabel(f))}</button>`).join('')}
+      </div>
+      <div class="filterbar-right">
+        <div class="scope-toggle">
+          <button class="${state.scope==='mine'?'on':''}" data-scope="mine" ${state.currentOwner?'':'disabled'}>${t('my_items')}</button>
+          <button class="${state.scope==='team'?'on':''}" data-scope="team">${t('whole_team')}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function sparkPath(projection, w, hgt){
+  if(!projection.length) return '';
+  const vals = projection.map(p=>p.value);
+  const max = Math.max(...vals, 1);
+  const min = Math.min(...vals, 0);
+  const range = (max-min) || 1;
+  const step = w/(vals.length-1||1);
+  const y = v => hgt - ((v-min)/range)*hgt;
+  let d = vals.map((v,i)=> `${i===0?'M':'L'}${(i*step).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  return { d, zeroY: y(0) };
+}
+
+function renderSparkline(it){
+  const w=100,hgt=28;
+  const sp = sparkPath(it.projection, w, hgt);
+  if(!sp) return '';
+  const color = COLORS[it.category].hex;
+  return h`<svg width="${w}" height="${hgt+4}" viewBox="0 0 ${w} ${hgt+4}">
+    <line x1="0" y1="${sp.zeroY.toFixed(1)}" x2="${w}" y2="${sp.zeroY.toFixed(1)}" stroke="var(--border)" stroke-width="1" stroke-dasharray="2,2"/>
+    <path d="${sp.d}" fill="none" stroke="${color}" stroke-width="1.6"/>
+  </svg>`;
+}
+
+function metricCell(it){
+  if(it.category==='RUPTURE') return h`<div class="m-main">${fmtWeeks(it.weeksToRupture)}</div><div class="m-sub">${t('m_rupture')}</div>`;
+  if(it.category==='UNDER_SAFETY_TRANSPORT') return h`<div class="m-main">${fmtWeeks(it.weeksToUnderSafetyTransport)}</div><div class="m-sub">${t('m_transport')}</div>`;
+  if(it.category==='UNDER_SAFETY_DEMAND') return h`<div class="m-main">${fmtWeeks(it.weeksToUnderSafetyDemand)}</div><div class="m-sub">${t('m_demand')}</div>`;
+  if(it.category==='OVERSTOCK') return h`<div class="m-main">${fmtEur(it.overstockValue)}</div><div class="m-sub">${t('m_value')}</div>`;
+  if(it.category==='SWEET_SPOT'){
+    if(it.farRupture) return h`<div class="m-main" style="color:var(--amber)">${fmtWeeks(it.weeksToRupture)}</div><div class="m-sub">${t('m_far_rupture')}</div>`;
+    if(it.farUnderSafetyTransport) return h`<div class="m-main" style="color:var(--amber)">${fmtWeeks(it.weeksToUnderSafetyTransport)}</div><div class="m-sub">${t('m_far_transport')}</div>`;
+    if(it.farUnderSafetyDemand) return h`<div class="m-main" style="color:var(--violet)">${fmtWeeks(it.weeksToUnderSafetyDemand)}</div><div class="m-sub">${t('m_far_demand')}</div>`;
+    return h`<div class="m-main" style="color:var(--green)">✓</div><div class="m-sub">${t('m_none')}</div>`;
+  }
+  return h`<div class="m-main">-</div>`;
+}
+
+function renderList(){
+  const items = getFilteredItems();
+  if(items.length===0){
+    return h`<div class="list-wrap"><div class="empty-state">${ICONS.box}<div>${t('empty_list')}</div></div></div>`;
+  }
+  if(state.category==='NO_FORECAST'){
+    return h`
+      <div class="list-wrap">
+        <div class="list-head" style="grid-template-columns: 140px 1.4fr 1.4fr 110px;">
+          <div>PN</div><div>${t('col_project')}</div><div>${t('col_supplier')}</div><div style="text-align:right">${t('col_status')}</div>
+        </div>
+        ${items.map(it => h`
+          <div class="list-row" style="grid-template-columns: 140px 1.4fr 1.4fr 110px; cursor:default;">
+            <div class="cell-pn"><span class="owner-dot" style="background:${ownerColor(it.owner)}" title="${esc(ownerLabel(it.owner))}"></span>${esc(it.pn)}<button class="copy-btn" data-copy-pn="${esc(it.pn)}" title="${t('copy_pn')}">${ICONS.copy}</button></div>
+            <div class="cell-proj">${it.families.slice(0,2).map(f=>`<span class="tag">${esc(famLabel(f))}</span>`).join('')}</div>
+            <div class="cell-supplier" title="${esc(it.supplier)}">${esc(it.supplier)}</div>
+            <div class="cell-num" style="color:${it.active && it.active.toLowerCase().includes('no') ? 'var(--text-faint)' : 'var(--green)'}">${esc(it.active)||'-'}</div>
+          </div>`).join('')}
+        <div class="list-footer">
+          <span>${t('nf_footer', items.length)}</span>
+          <span>${t('nf_footer2')}</span>
+        </div>
+      </div>`;
+  }
+  return h`
+    <div class="list-wrap">
+      ${state.category==='ALL' ? `<div class="all-mode-banner">${ICONS.search} ${t('all_banner')}</div>` : ''}
+      <div class="list-head">
+        <div>PN</div><div>${t('col_project')}</div><div>${t('col_supplier')}</div><div style="text-align:right">${t('col_stock')}</div>
+        <div style="text-align:right">${t('col_need_wk')}</div><div style="text-align:right">${t('col_status')}</div><div style="text-align:right">${t('col_trend')}</div><div></div>
+      </div>
+      ${items.map(it => h`
+        <div class="list-row" data-open="${esc(it.pn)}">
+          <div class="cell-pn">${state.category==='ALL'?`<span class="cat-dot" style="background:${COLORS[it.category].hex}" title="${esc(t('cat_'+it.category))}"></span>`:''}<span class="owner-dot" style="background:${ownerColor(it.owner)}" title="${esc(ownerLabel(it.owner))}"></span>${esc(it.pn)}<button class="copy-btn" data-copy-pn="${esc(it.pn)}" title="${t('copy_pn')}">${ICONS.copy}</button></div>
+          <div class="cell-proj">${it.families.slice(0,2).map(f=>`<span class="tag">${esc(famLabel(f))}</span>`).join('')}</div>
+          <div class="cell-supplier" title="${esc(it.supplier)}">${esc(it.supplier)}</div>
+          <div class="cell-num">${fmtNum(it.current)}</div>
+          <div class="cell-num">${fmtNum(it.avg)}</div>
+          <div class="cell-metric">${metricCell(it)}</div>
+          <div class="cell-spark">${renderSparkline(it)}</div>
+          <div class="cell-arrow">${ICONS.arrow}</div>
+        </div>`).join('')}
+      <div class="list-footer">
+        <span>${t('shown_footer', items.length)}${state.category==='ALL'?t('all_cats_suffix'):''}</span>
+        <span>${t('thresholds_footer', SETTINGS.ruptureHorizonWeeks, SETTINGS.safetyDelayWeeks, fmtEur(SETTINGS.overstockValueThreshold))}</span>
+      </div>
+    </div>`;
+}
+
+function renderDashboard(){
+  return h`
+    ${renderTopbar()}
+    <div class="main">
+      ${renderAndonRow()}
+      ${renderSecondaryRow()}
+      ${renderFilterBar()}
+      ${renderList()}
+    </div>
+    ${state.drawerItem ? renderDrawer(state.drawerItem) : ''}
+  `;
+}
+
+/* ---------------------------- RENDER: TEAM OVERVIEW ---------------------------- */
+function buildOwnerStats(){
+  const byOwner = {};
+  const ensure = o => { if(!byOwner[o]) byOwner[o] = { owner:o, RUPTURE:0, UNDER_SAFETY_TRANSPORT:0, UNDER_SAFETY_DEMAND:0, OVERSTOCK:0, SWEET_SPOT:0, INACTIVE:0, overstockValue:0, totalValue:0, soonestRupture:null, soonestRupturePn:null, noForecast:0 }; return byOwner[o]; };
+  state.items.forEach(it=>{
+    const s = ensure(it.owner);
+    s[it.category] = (s[it.category]||0)+1;
+    s.totalValue += (it.overstockValue||0); // value of stock sitting in the calendar, ALL items, not just flagged surstock
+    if(it.category==='OVERSTOCK') s.overstockValue += (it.overstockValue||0);
+    if(it.category==='RUPTURE' && (s.soonestRupture===null || it.weeksToRupture<s.soonestRupture)){
+      s.soonestRupture = it.weeksToRupture; s.soonestRupturePn = it.pn;
+    }
+  });
+  state.noForecast.forEach(it=>{ ensure(it.owner).noForecast++; });
+  return Object.values(byOwner);
+}
+
+function buildOwnerBarplotSVG(stats){
+  const cats = [
+    {k:'RUPTURE', c:COLORS.RUPTURE.hex}, {k:'UNDER_SAFETY_TRANSPORT', c:COLORS.UNDER_SAFETY_TRANSPORT.hex},
+    {k:'UNDER_SAFETY_DEMAND', c:COLORS.UNDER_SAFETY_DEMAND.hex},
+    {k:'OVERSTOCK', c:COLORS.OVERSTOCK.hex}, {k:'SWEET_SPOT', c:COLORS.SWEET_SPOT.hex},
+  ];
+  const w = 760, h = 260, padL = 46, padR = 12, padT = 14, padB = 42;
+  const innerW = w-padL-padR, innerH = h-padT-padB;
+  const maxV = Math.max(...stats.flatMap(s=>cats.map(c=>s[c.k]||0)), 1);
+  const groupW = innerW/stats.length;
+  const barGap = 3, groupPad = 14;
+  const barW = (groupW - groupPad*2 - barGap*(cats.length-1)) / cats.length;
+  const y = v => padT + innerH - (v/maxV)*innerH;
+
+  let grid = '';
+  const gridCount = 4;
+  for(let g=0; g<=gridCount; g++){
+    const v = (maxV*g/gridCount);
+    const gy = y(v);
+    grid += `<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${w-padR}" y2="${gy.toFixed(1)}" stroke="#232833" stroke-width="1"/>`;
+    grid += `<text x="${padL-8}" y="${(gy+3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#5c6572" font-family="IBM Plex Mono">${Math.round(v)}</text>`;
+  }
+
+  let bars = '', labels = '';
+  stats.forEach((s,gi)=>{
+    const gx0 = padL + gi*groupW + groupPad;
+    cats.forEach((c,ci)=>{
+      const v = s[c.k]||0;
+      const bx = gx0 + ci*(barW+barGap);
+      const by = y(v);
+      const bh = (padT+innerH) - by;
+      bars += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0,bh).toFixed(1)}" fill="${c.c}" rx="1.5"><title>${esc(ownerLabel(s.owner))}, ${t('cat_'+c.k)} : ${v}</title></rect>`;
+      if(v>0 && barW>10) bars += `<text x="${(bx+barW/2).toFixed(1)}" y="${(by-4).toFixed(1)}" text-anchor="middle" font-size="9" fill="#9aa4b2" font-family="IBM Plex Mono">${v}</text>`;
+    });
+    const gcx = padL + gi*groupW + groupW/2;
+    labels += `<text x="${gcx.toFixed(1)}" y="${h-14}" text-anchor="middle" font-size="11" fill="#c9cedb" font-family="IBM Plex Sans Condensed" font-weight="600">${esc(ownerLabel(s.owner))}</text>`;
+  });
+
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="display:block;">${grid}${bars}${labels}</svg>`;
+}
+
+function renderOverviewBar(s, total){
+  const w = 100;
+  const segs = [
+    {v:s.RUPTURE, c:COLORS.RUPTURE.hex}, {v:s.UNDER_SAFETY_TRANSPORT, c:COLORS.UNDER_SAFETY_TRANSPORT.hex},
+    {v:s.UNDER_SAFETY_DEMAND, c:COLORS.UNDER_SAFETY_DEMAND.hex},
+    {v:s.OVERSTOCK, c:COLORS.OVERSTOCK.hex}, {v:s.SWEET_SPOT, c:COLORS.SWEET_SPOT.hex},
+    {v:s.INACTIVE, c:'#3a4150'},
+  ];
+  let x = 0, rects = '';
+  segs.forEach(seg=>{
+    if(seg.v<=0) return;
+    const sw = (seg.v/total)*w;
+    rects += `<rect x="${x.toFixed(1)}" y="0" width="${sw.toFixed(1)}" height="10" fill="${seg.c}"/>`;
+    x += sw;
+  });
+  return `<svg viewBox="0 0 ${w} 10" width="100%" height="10" style="display:block; border-radius:2px; overflow:hidden;">${rects}</svg>`;
+}
+
+function renderOverview(){
+  const stats = buildOwnerStats().map(s=>({ ...s, total: s.RUPTURE+s.UNDER_SAFETY_TRANSPORT+s.UNDER_SAFETY_DEMAND+s.OVERSTOCK+s.SWEET_SPOT+s.INACTIVE }));
+  const sortKey = state.overviewSort || 'RUPTURE';
+  stats.sort((a,b)=>{
+    if(sortKey==='owner') return a.owner.localeCompare(b.owner);
+    if(sortKey==='totalValue') return b.totalValue - a.totalValue;
+    return (b[sortKey]||0) - (a[sortKey]||0);
+  });
+  const team = {
+    RUPTURE: stats.reduce((s,x)=>s+x.RUPTURE,0), UNDER_SAFETY_TRANSPORT: stats.reduce((s,x)=>s+x.UNDER_SAFETY_TRANSPORT,0),
+    UNDER_SAFETY_DEMAND: stats.reduce((s,x)=>s+x.UNDER_SAFETY_DEMAND,0),
+    OVERSTOCK: stats.reduce((s,x)=>s+x.OVERSTOCK,0), SWEET_SPOT: stats.reduce((s,x)=>s+x.SWEET_SPOT,0),
+    totalValue: stats.reduce((s,x)=>s+x.totalValue,0), total: stats.reduce((s,x)=>s+x.total,0),
+  };
+  const sortOptions = [
+    {k:'RUPTURE', label:t('cat_RUPTURE')}, {k:'UNDER_SAFETY_TRANSPORT', label:t('lg_transport')}, {k:'UNDER_SAFETY_DEMAND', label:t('lg_demand')},
+    {k:'totalValue', label:t('sort_value')}, {k:'total', label:t('sort_total')}, {k:'owner', label:t('sort_name')},
+  ];
+  return h`
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="icon-btn" id="btnBackToDash" title="${t('back_dash')}">${ICONS.arrowLeft}</button>
+      <div class="brand-mark">${ICONS.logo}</div>
+      <div class="tb-title">${t('ov_title')}</div>
+      <div class="tb-week">${weekLabel()}</div>
+    </div>
+    <div class="topbar-right">${renderLangSwitcher()}</div>
+  </div>
+  <div class="main">
+    <div class="ov-summary">
+      <div class="ov-card" style="color:${COLORS.RUPTURE.hex}"><div class="ov-num">${team.RUPTURE}</div><div class="ov-label">${t('ov_rupture_team')}</div></div>
+      <div class="ov-card" style="color:${COLORS.UNDER_SAFETY_TRANSPORT.hex}"><div class="ov-num">${team.UNDER_SAFETY_TRANSPORT}</div><div class="ov-label">${t('ov_transport_team')}</div></div>
+      <div class="ov-card" style="color:${COLORS.UNDER_SAFETY_DEMAND.hex}"><div class="ov-num">${team.UNDER_SAFETY_DEMAND}</div><div class="ov-label">${t('ov_demand_team')}</div></div>
+      <div class="ov-card" style="color:${COLORS.OVERSTOCK.hex}"><div class="ov-num">${fmtEur(team.totalValue)}</div><div class="ov-label">${t('ov_value_team')}</div></div>
+      <div class="ov-card" style="color:${COLORS.SWEET_SPOT.hex}"><div class="ov-num">${team.SWEET_SPOT}</div><div class="ov-label">${t('ov_sweet_team')}</div></div>
+    </div>
+
+    <div class="dr-section" style="margin-top:6px;">
+      <h4>${t('ov_compare')}</h4>
+      <div class="chart-legend">
+        <div class="lg-item"><span class="lg-swatch" style="background:${COLORS.RUPTURE.hex}"></span>${t('cat_RUPTURE')}</div>
+        <div class="lg-item"><span class="lg-swatch" style="background:${COLORS.UNDER_SAFETY_TRANSPORT.hex}"></span>${t('lg_transport')}</div>
+        <div class="lg-item"><span class="lg-swatch" style="background:${COLORS.UNDER_SAFETY_DEMAND.hex}"></span>${t('lg_demand')}</div>
+        <div class="lg-item"><span class="lg-swatch" style="background:${COLORS.OVERSTOCK.hex}"></span>${t('cat_OVERSTOCK')}</div>
+        <div class="lg-item"><span class="lg-swatch" style="background:${COLORS.SWEET_SPOT.hex}"></span>${t('cat_SWEET_SPOT')}</div>
+      </div>
+      <div class="ov-barplot">${buildOwnerBarplotSVG(stats)}</div>
+    </div>
+
+    <div class="ov-toolbar">
+      <span class="ov-toolbar-label">${t('sort_by')}</span>
+      ${sortOptions.map(o=>h`<button class="sort-chip ${sortKey===o.k?'on':''}" data-sort="${o.k}">${o.label}</button>`).join('')}
+    </div>
+
+    <div class="ov-table">
+      <div class="ov-head">
+        <div>${t('ov_employee')}</div><div>${t('ov_split')}</div>
+        <div style="text-align:right">${t('cat_RUPTURE')}</div><div style="text-align:right">${t('ov_sec_t')}</div><div style="text-align:right">${t('ov_sec_d')}</div>
+        <div style="text-align:right">${t('cat_OVERSTOCK')}</div><div style="text-align:right">${t('ov_value_col')}</div>
+        <div style="text-align:right">${t('cat_SWEET_SPOT')}</div><div style="text-align:right">${t('ov_total')}</div>
+        <div>${t('ov_urgent')}</div>
+      </div>
+      ${stats.map(s => h`
+        <div class="ov-row" data-goto-owner="${esc(s.owner)}">
+          <div class="ov-owner">
+            <div class="avatar-circle" style="width:30px;height:30px;font-size:12px;background:${ownerColor(s.owner)}">${esc(initials(s.owner))}</div>
+            <div>
+              <div class="ov-owner-name">${esc(ownerLabel(s.owner))}</div>
+              <div class="ov-owner-sub">${s.noForecast>0? t('ov_nf_sub', s.noForecast) : ''}</div>
+            </div>
+          </div>
+          <div class="ov-bar-cell">
+            <div class="ov-bar-wrap">${renderOverviewBar(s, s.total||1)}</div>
+          </div>
+          <div class="ov-num-cell" style="color:${s.RUPTURE>0?COLORS.RUPTURE.hex:'inherit'}; font-weight:${s.RUPTURE>0?700:400}">${s.RUPTURE}</div>
+          <div class="ov-num-cell" style="color:${s.UNDER_SAFETY_TRANSPORT>0?COLORS.UNDER_SAFETY_TRANSPORT.hex:'inherit'}; font-weight:${s.UNDER_SAFETY_TRANSPORT>0?700:400}">${s.UNDER_SAFETY_TRANSPORT}</div>
+          <div class="ov-num-cell" style="color:${s.UNDER_SAFETY_DEMAND>0?COLORS.UNDER_SAFETY_DEMAND.hex:'inherit'}; font-weight:${s.UNDER_SAFETY_DEMAND>0?700:400}">${s.UNDER_SAFETY_DEMAND}</div>
+          <div class="ov-num-cell">${s.OVERSTOCK}</div>
+          <div class="ov-num-cell">${fmtEur(s.totalValue)}</div>
+          <div class="ov-num-cell">${s.SWEET_SPOT}</div>
+          <div class="ov-num-cell" style="font-weight:700">${s.total}</div>
+          <div class="ov-urgent">${s.soonestRupturePn ? `${esc(s.soonestRupturePn)} · ${fmtWeeks(s.soonestRupture)}` : '-'}</div>
+        </div>`).join('')}
+    </div>
+    <div class="ov-footnote">${t('ov_footnote')}</div>
+  </div>`;
+}
+
+/* ---------------------------- RENDER: DRAWER ---------------------------- */
+function statusBannerContent(it){
+  const meta = COLORS[it.category];
+  let title, sub;
+  if(it.category==='RUPTURE'){ title = it.weeksToRupture===0 ? t('b_already') : t('b_rupture_t', fmtWeeks(it.weeksToRupture)); sub = t('b_rupture_s', stockDate(it.weeksToRupture)); }
+  else if(it.category==='UNDER_SAFETY_TRANSPORT'){ title = t('b_transport_t'); sub = t('b_transport_s', SETTINGS.safetyDelayWeeks, stockDate(it.weeksToUnderSafetyTransport)); }
+  else if(it.category==='UNDER_SAFETY_DEMAND'){ title = t('b_demand_t'); sub = t('b_demand_s', fmtNum(it.demandSpikeThreshold), SETTINGS.demandSpikeMultiplier, SETTINGS.ruptureHorizonWeeks, stockDate(it.weeksToUnderSafetyDemand)); }
+  else if(it.category==='OVERSTOCK'){ title = t('cat_OVERSTOCK'); sub = t('b_overstock_s', fmtEur(it.overstockValue), fmtEur(SETTINGS.overstockValueThreshold)); }
+  else if(it.category==='SWEET_SPOT'){
+    if(it.farRupture){ title = t('b_far_rupture_t', fmtWeeks(it.weeksToRupture)); sub = t('b_far_rupture_s', stockDate(it.weeksToRupture), SETTINGS.ruptureHorizonWeeks); }
+    else if(it.farUnderSafetyTransport){ title = t('b_far_transport_t', fmtWeeks(it.weeksToUnderSafetyTransport)); sub = t('b_far_transport_s', SETTINGS.safetyDelayWeeks, stockDate(it.weeksToUnderSafetyTransport), SETTINGS.ruptureHorizonWeeks); }
+    else if(it.farUnderSafetyDemand){ title = t('b_far_demand_t', fmtWeeks(it.weeksToUnderSafetyDemand)); sub = t('b_far_demand_s', SETTINGS.demandSpikeMultiplier, stockDate(it.weeksToUnderSafetyDemand), SETTINGS.ruptureHorizonWeeks); }
+    else { title = t('b_sweet_t'); sub = t('b_sweet_s', SETTINGS.safetyDelayWeeks, SETTINGS.demandSpikeMultiplier, fmtEur(it.overstockValue)); }
+  }
+  else { title=t('cat_INACTIVE'); sub=t('b_inactive_s'); }
+  return { meta, title, sub };
+}
+
+function renderDrawer(it){
+  const { meta, title, sub } = statusBannerContent(it);
+  return h`
+  <div class="overlay" id="drawerOverlay"></div>
+  <div class="drawer">
+    <div class="drawer-head">
+      <div>
+        <div class="drawer-pn">${esc(it.pn)}<button class="copy-btn" data-copy-pn="${esc(it.pn)}" title="${t('copy_pn')}" style="width:26px;height:26px;vertical-align:middle;margin-left:4px;">${ICONS.copy}</button></div>
+        <div class="drawer-tags">
+          ${it.families.map(f=>`<span class="tag">${esc(famLabel(f))}</span>`).join('')}
+          ${it.active ? `<span class="tag" style="color:${it.active.toLowerCase().includes('no')?'var(--text-faint)':'var(--green)'}">${esc(it.active)}</span>` : ''}
+        </div>
+      </div>
+      <button class="drawer-close" id="drawerClose">${ICONS.x}</button>
+    </div>
+    <div class="drawer-body">
+      <div class="status-banner" style="background:${meta.tint}; border-color:${meta.hex}55;">
+        <span style="color:${meta.hex}" class="sb-icon">${ICONS[meta.icon]}</span>
+        <div>
+          <div class="sb-title" style="color:${meta.hex}">${title}</div>
+          <div class="sb-sub">${sub}</div>
+        </div>
+      </div>
+
+      <div class="kpi-grid" style="margin-bottom:24px;">
+        <div class="kpi-box">
+          <div class="k-label">${t('k_stock')}</div>
+          <div class="k-val">${fmtNum(it.current)}</div>
+          ${it.raben>0 ? `<div class="k-detail">${t('k_raben', fmtNum(it.raben))}</div>` : ''}
+        </div>
+        <div class="kpi-box"><div class="k-label">${t('k_need')}</div><div class="k-val">${fmtNum(it.avg)}</div></div>
+        <div class="kpi-box"><div class="k-label">${t('k_cover')}</div><div class="k-val">${it.coverageNow===Infinity?'∞':fmtNum(it.coverageNow)+t('suffix_weeks')}</div></div>
+        <div class="kpi-box"><div class="k-label">${t('k_value')}</div><div class="k-val">${fmtEur(it.overstockValue)}</div></div>
+      </div>
+      ${it.raben>0 ? `<div class="raben-note">${ICONS.box} ${t('raben_note', fmtNum(it.allStock), fmtNum(it.raben), fmtNum(it.current))}</div>` : ''}
+
+      <div class="dr-section">
+        <h4>${t('dr_proj', it.projection.length)}</h4>
+        <div class="chart-legend">
+          <div class="lg-item"><span class="lg-swatch" style="background:${COLORS.RUPTURE.hex}"></span>${t('cat_RUPTURE')}</div>
+          <div class="lg-item"><span class="lg-swatch" style="background:${COLORS.UNDER_SAFETY_TRANSPORT.hex}"></span>${t('lg_transport_sim')}</div>
+          <div class="lg-item"><span class="lg-swatch" style="background:${COLORS.UNDER_SAFETY_DEMAND.hex}"></span>${t('lg_spike')}</div>
+          <div class="lg-item"><span class="lg-swatch" style="background:${COLORS.SWEET_SPOT.hex}"></span>${t('cat_SWEET_SPOT')}</div>
+          <div class="lg-item"><span class="lg-swatch" style="background:${COLORS.OVERSTOCK.hex}"></span>${t('cat_OVERSTOCK')}</div>
+        </div>
+        <div id="drawerChart"></div>
+      </div>
+
+      ${renderEdiPlanner(it)}
+
+      <div class="dr-section">
+        <h4>${t('dr_need')}</h4>
+        <div id="drawerNeedChart"></div>
+      </div>
+
+      <div class="dr-section">
+        <h4>${t('dr_oo')}</h4>
+        ${renderOpenOrdersTable(it)}
+      </div>
+
+      <div class="dr-section">
+        <h4>${t('dr_info')}</h4>
+        <div class="info-grid">
+          <div class="info-item"><div class="i-label">${t('i_owner')}</div><div class="i-val">${esc(ownerLabel(it.owner))}</div></div>
+          <div class="info-item"><div class="i-label">${t('col_supplier')}</div><div class="i-val">${esc(it.supplier)||'-'}</div></div>
+          <div class="info-item"><div class="i-label">${t('i_cat')}</div><div class="i-val">${esc(it.cat)||'-'}</div></div>
+          <div class="info-item"><div class="i-label">${t('i_loc')}</div><div class="i-val">${esc(it.supplierLoc)||'-'}</div></div>
+          <div class="info-item"><div class="i-label">${t('i_sa')}</div><div class="i-val">${esc(it.sa)||'-'}</div></div>
+          <div class="info-item"><div class="i-label">${t('i_supref')}</div><div class="i-val">${esc(it.supplierPn)||'-'}</div></div>
+          <div class="info-item"><div class="i-label">${t('i_lead')}</div><div class="i-val">${esc(it.leadTime)||'-'}</div></div>
+          <div class="info-item"><div class="i-label">${t('i_moq')}</div><div class="i-val">${esc(it.moq)||'-'} ${it.lotSize?'/ '+esc(it.lotSize):''}</div></div>
+          <div class="info-item"><div class="i-label">${t('i_incoterm')}</div><div class="i-val">${esc(it.incoterm)||'-'}</div></div>
+          <div class="info-item"><div class="i-label">${t('i_contact')}</div><div class="i-val">${esc(it.contact)||'-'}</div></div>
+          <div class="info-item" style="grid-column:1/-1;"><div class="i-label">${t('i_comment')}</div><div class="i-val">${esc(it.comment)||'-'}</div></div>
+          <div class="info-item" style="grid-column:1/-1;"><div class="i-label">${t('i_project_col')}</div><div class="i-val">${esc(it.projectDetail)||'-'}</div></div>
+          <div class="info-item" style="grid-column:1/-1;"><div class="i-label">${t('i_status_col')}</div><div class="i-val">${esc(it.statusCategory)||'-'}</div></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderOpenOrdersTable(it){
+  if(!it.openOrders.length) return `<div class="oo-empty">${t('oo_empty')}</div>`;
+  const rows = [];
+  it.openOrders.forEach(po=>{
+    if(po.backlog>0) rows.push({ sa:po.sa, supplier:po.supplier, date:t('oo_late'), qty:po.backlog, late:true });
+    po.weeks.forEach(w=> rows.push({ sa:po.sa, supplier:po.supplier, date:w.date||t('oo_week', w.label), qty:w.qty, late:false }));
+  });
+  return h`
+    <table class="oo-table">
+      <thead><tr><th>SA</th><th>${t('col_supplier')}</th><th>${t('oo_arrival')}</th><th style="text-align:right">${t('oo_qty')}</th></tr></thead>
+      <tbody>
+        ${rows.map(r=>h`<tr><td>${esc(r.sa)||'-'}</td><td>${esc(r.supplier)}</td><td style="${r.late?'color:var(--red)':''}">${esc(r.date)}</td><td style="text-align:right">${fmtNum(r.qty)}</td></tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+/* ---------------------------- SVG CHARTS (no external library: always works) ---------------------------- */
+function buildStockChartSVG(it, sim){
+  // `sim` (optional) = result of simulatePlan(): when present, the chart overlays the user's EDI plan -
+  // the original curve fades to a thin gray reference, and the new baseline / new delayed take over.
+  const w = 720, h = 220, padL = 44, padR = 12, padT = 12, padB = 26;
+  const innerW = w - padL - padR, innerH = h - padT - padB;
+  const orig = it.projection.map(p=>p.value);
+  const origDelayed = buildEDIDelayCalendar(it, SETTINGS.safetyDelayWeeks);
+  const data = sim ? sim.baseline : orig;
+  const delayed = sim ? sim.delayed : origDelayed;
+  const spikeThreshold = it.demandSpikeThreshold || 0;
+  const allVals = data.concat(delayed).concat(sim ? orig : []).concat([0, spikeThreshold]);
+  const max = Math.max(...allVals), min = Math.min(...allVals);
+  const range = (max-min) || 1;
+  const pad = range*0.08;
+  const yMax = max+pad, yMin = min-pad, yRange = (yMax-yMin)||1;
+  const n = data.length;
+  const x = i => padL + (n<=1 ? 0 : (i/(n-1))*innerW);
+  const y = v => padT + innerH - ((v-yMin)/yRange)*innerH;
+
+  const pointColors = data.map((v,i)=>{
+    if(v<0) return COLORS.RUPTURE.hex;
+    if(delayed[i]<0) return COLORS.UNDER_SAFETY_TRANSPORT.hex;
+    if(spikeThreshold>0 && v<spikeThreshold) return COLORS.UNDER_SAFETY_DEMAND.hex;
+    return it.category==='OVERSTOCK' && !sim ? COLORS.OVERSTOCK.hex : COLORS.SWEET_SPOT.hex;
+  });
+
+  const gridCount = 4;
+  let grid = '';
+  for(let g=0; g<=gridCount; g++){
+    const v = yMin + (yRange*g/gridCount);
+    const gy = y(v);
+    grid += `<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${w-padR}" y2="${gy.toFixed(1)}" stroke="#232833" stroke-width="1"/>`;
+    grid += `<text x="${padL-8}" y="${(gy+3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="#5c6572" font-family="IBM Plex Mono">${fmtAxis(v)}</text>`;
+  }
+  let zeroLine = '';
+  if(yMin<0 && yMax>0){
+    const zy = y(0);
+    zeroLine = `<line x1="${padL}" y1="${zy.toFixed(1)}" x2="${w-padR}" y2="${zy.toFixed(1)}" stroke="${COLORS.RUPTURE.hex}" stroke-width="1.2" stroke-dasharray="3,3"/>`;
+  }
+  let spikeLine = '';
+  if(spikeThreshold>0){
+    const sy = y(spikeThreshold);
+    spikeLine = `<line x1="${padL}" y1="${sy.toFixed(1)}" x2="${w-padR}" y2="${sy.toFixed(1)}" stroke="${COLORS.UNDER_SAFETY_DEMAND.hex}" stroke-width="1.2" stroke-dasharray="3,3"><title>${t('ch_spike_title', fmtNum(spikeThreshold))}</title></line>`;
+    spikeLine += `<text x="${w-padR}" y="${(sy-4).toFixed(1)}" text-anchor="end" font-size="9" fill="${COLORS.UNDER_SAFETY_DEMAND.hex}" font-family="IBM Plex Mono">${t('ch_spike_label')}</text>`;
+  }
+  let xLabels = '';
+  const step = Math.ceil(n/8);
+  for(let i=0;i<n;i+=step){
+    xLabels += `<text x="${x(i).toFixed(1)}" y="${h-8}" text-anchor="${i===n-1?'end':'middle'}" font-size="9.5" fill="#5c6572" font-family="IBM Plex Mono">${stockDate(i)}</text>`;
+  }
+  const pathOf = arr => arr.map((v,i)=> `${i===0?'M':'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const mainPath = pathOf(data);
+  const points = data.map((v,i)=> `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3" fill="${pointColors[i]}"><title>${stockDate(i)} : ${fmtNum(v)}</title></circle>`).join('');
+  const delayPath = pathOf(delayed);
+  const origPath = sim ? `<path d="${pathOf(orig)}" fill="none" stroke="#5c6572" stroke-width="1.2"><title>${t('ch_orig')}</title></path>` : '';
+
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="display:block;">
+    ${grid}${zeroLine}${spikeLine}
+    ${origPath}
+    <path d="${delayPath}" fill="none" stroke="${COLORS.UNDER_SAFETY_TRANSPORT.hex}" stroke-width="1.4" stroke-dasharray="3,3"/>
+    <path d="${mainPath}" fill="none" stroke="#c9cedb" stroke-width="2"/>
+    ${points}
+    ${xLabels}
+  </svg>`;
+}
+
+function buildNeedChartSVG(it){
+  const w = 720, h = 150, padL = 44, padR = 12, padT = 10, padB = 26;
+  const innerW = w - padL - padR, innerH = h - padT - padB;
+  const vals = it.weeklyNeed.map(wk=>wk.value);
+  const max = Math.max(...vals, 1);
+  const n = vals.length;
+  const barW = Math.max(1.5, (innerW/n) * 0.62);
+  const gap = innerW/n;
+  const y = v => padT + innerH - (v/max)*innerH;
+  let bars = '';
+  vals.forEach((v,i)=>{
+    const bx = padL + i*gap + (gap-barW)/2;
+    const by = y(v);
+    const bh = (padT+innerH) - by;
+    bars += `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(0,bh).toFixed(1)}" fill="#4c9fe855" stroke="#4c9fe8" stroke-width="1" rx="1"><title>${esc(it.weeklyNeed[i].date||it.weeklyNeed[i].label)} : ${fmtNum(v)}</title></rect>`;
+  });
+  let grid = `<line x1="${padL}" y1="${(padT+innerH).toFixed(1)}" x2="${w-padR}" y2="${(padT+innerH).toFixed(1)}" stroke="#232833" stroke-width="1"/>`;
+  grid += `<text x="${padL-8}" y="${padT+4}" text-anchor="end" font-size="9.5" fill="#5c6572" font-family="IBM Plex Mono">${fmtAxis(max)}</text>`;
+  let xLabels = '';
+  const step = Math.ceil(n/8);
+  for(let i=0;i<n;i+=step){
+    const lx = padL + i*gap + gap/2;
+    xLabels += `<text x="${lx.toFixed(1)}" y="${h-8}" text-anchor="middle" font-size="9" fill="#5c6572" font-family="IBM Plex Mono">${esc((it.weeklyNeed[i].date||it.weeklyNeed[i].label||'').toString())}</text>`;
+  }
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="display:block;">${grid}${bars}${xLabels}</svg>`;
+}
+
+function currentPlanFor(it){
+  if(!state.ediPlannerOpen || !state.ediPlan || state.ediPlan.pn!==it.pn) return null;
+  return state.ediPlan.qty;
+}
+function renderDrawerChart(){
+  const it = state.drawerItem;
+  const target1 = document.getElementById('drawerChart');
+  const target2 = document.getElementById('drawerNeedChart');
+  const plan = currentPlanFor(it);
+  if(target1) target1.innerHTML = buildStockChartSVG(it, plan ? simulatePlan(it, plan) : null);
+  if(target2) target2.innerHTML = buildNeedChartSVG(it);
+}
+
+/* ---------------------------- EDI PLANNER UI ---------------------------- */
+function existingEdiByDate(it){
+  const m = {};
+  (it.openOrders||[]).forEach(po=>po.weeks.forEach(w=>{ if(w.qty>0) m[w.date]=(m[w.date]||0)+w.qty; }));
+  return m;
+}
+function ediStatusLabel(s){
+  return s==='ok' ? 'OK' : s==='rupture' ? t('m_rupture') : s==='transport' ? t('m_transport') : t('m_demand');
+}
+function verdictHTML(it, sim){
+  const unit = niceUnitFor(it);
+  if(sim.ok){
+    return `<div class="edi-verdict ok">${ICONS.check}<div>${t('v_ok', SETTINGS.safetyDelayWeeks, SETTINGS.demandSpikeMultiplier, fmtNum(sim.totalQty))}</div></div>`;
+  }
+  if(sim.failCount===sim.unfixable){
+    const msg = sim.unfixable===1 ? t('v_warn_one', fmtNum(sim.totalQty)) : t('v_warn_many', sim.unfixable, fmtNum(sim.totalQty));
+    return `<div class="edi-verdict warn">${ICONS.warn}<div>${msg}</div></div>`;
+  }
+  const fixable = sim.failCount - sim.unfixable;
+  const unfixPart = sim.unfixable ? (sim.unfixable===1 ? t('v_unfix_one') : t('v_unfix_many', sim.unfixable)) : '';
+  const msg = fixable===1
+    ? t('v_bad_one', stockDate(sim.firstFail), ediStatusLabel(sim.weekStatus[sim.firstFail]), unfixPart, fmtNum(unit))
+    : t('v_bad_many', fixable, stockDate(sim.firstFail), ediStatusLabel(sim.weekStatus[sim.firstFail]), unfixPart, fmtNum(unit));
+  return `<div class="edi-verdict bad">${ICONS.stop}<div>${msg}</div></div>`;
+}
+function renderEdiPlanner(it){
+  const open = state.ediPlannerOpen && state.ediPlan && state.ediPlan.pn===it.pn;
+  if(!open){
+    return `<div class="dr-section">
+      <button class="btn edi-open-btn" id="btnOpenEdiPlanner">${ICONS.spike} ${t('edi_open')}</button>
+      <div class="edi-open-hint">${t('edi_open_hint')}</div>
+    </div>`;
+  }
+  const weeks = getEdiWeeks(it);
+  const qty = state.ediPlan.qty;
+  const sim = simulatePlan(it, qty);
+  const extra = computeMinPlan(it, 0, qty);
+  const existing = existingEdiByDate(it);
+  const unit = niceUnitFor(it);
+  const cells = weeks.map(w=>{
+    const q = qty[w.j] || 0;
+    const ex = extra[w.j] || 0;
+    const st = sim.weekStatus[w.landIdx];
+    const already = existing[w.date] || 0;
+    return `<div class="edi-cell st-${st}" data-edi-cell="${w.j}" title="${t('edi_cell_tt', esc(w.date), plantArrivalDate(w.landIdx))}">
+      <div class="edi-date">${esc(w.date)}</div>
+      <div class="edi-existing">${already>0?t('edi_already', fmtNum(already)):'&nbsp;'}</div>
+      <input type="number" class="edi-input" data-edi-input="${w.j}" min="0" step="${unit}" value="${q>0?q:''}" placeholder="0">
+      <div class="edi-hint ${ex>0?'need':''}" data-edi-hint="${w.j}">${ex>0?'+ '+fmtNum(Math.ceil(ex)):'✓'}</div>
+      <div class="edi-dot" data-edi-dot="${w.j}" title="${ediStatusLabel(st)}"></div>
+    </div>`;
+  }).join('');
+  return `<div class="dr-section edi-planner" id="ediPlanner">
+    <div class="edi-head">
+      <h4 style="margin:0;">${t('edi_title')}</h4>
+      <div class="edi-actions">
+        <button class="btn primary" id="btnEdiGenerate" title="${t('edi_gen_tt', fmtNum(unit))}">${ICONS.spike} ${t('edi_gen')}</button>
+        <button class="btn ghost" id="btnEdiClear">${t('edi_clear')}</button>
+        <button class="btn ghost" id="btnEdiExport" title="${t('edi_csv_tt')}">${ICONS.download} CSV</button>
+        <button class="btn ghost" id="btnEdiClose" title="${t('edi_close_tt')}">${ICONS.x}</button>
+      </div>
+    </div>
+    <div class="edi-explain">${t('edi_explain', RABEN_TO_PLANT_WEEKS, SETTINGS.safetyDelayWeeks)}</div>
+    <div id="ediVerdict">${verdictHTML(it, sim)}</div>
+    <div class="edi-strip-wrap"><div class="edi-strip">${cells}</div></div>
+    <div class="edi-legend">
+      <span><i class="edi-dot st-ok"></i> OK</span>
+      <span><i class="edi-dot st-demand"></i> ${t('lg_edi_demand')}</span>
+      <span><i class="edi-dot st-transport"></i> ${t('lg_edi_transport')}</span>
+      <span><i class="edi-dot st-rupture"></i> ${t('lg_edi_rupture')}</span>
+    </div>
+  </div>`;
+}
+function refreshEdiPlanner(it){
+  // live update without rebuilding the inputs (keeps focus): chart, verdict, per-week hints & dots
+  const qty = state.ediPlan.qty;
+  const sim = simulatePlan(it, qty);
+  const extra = computeMinPlan(it, 0, qty);
+  const chart = document.getElementById('drawerChart');
+  if(chart) chart.innerHTML = buildStockChartSVG(it, sim);
+  const v = document.getElementById('ediVerdict');
+  if(v) v.innerHTML = verdictHTML(it, sim);
+  getEdiWeeks(it).forEach(w=>{
+    const cell = document.querySelector(`[data-edi-cell="${w.j}"]`);
+    if(!cell) return;
+    const st = sim.weekStatus[w.landIdx];
+    cell.className = `edi-cell st-${st}`;
+    const hint = cell.querySelector('[data-edi-hint]');
+    const ex = extra[w.j] || 0;
+    if(hint){ hint.textContent = ex>0 ? '+ '+fmtNum(Math.ceil(ex)) : '✓'; hint.className = 'edi-hint '+(ex>0?'need':''); }
+    const dot = cell.querySelector('[data-edi-dot]');
+    if(dot) dot.title = ediStatusLabel(st);
+  });
+}
+function bindEdiPlanner(){
+  const it = state.drawerItem;
+  if(!it) return;
+  const openBtn = document.getElementById('btnOpenEdiPlanner');
+  if(openBtn) openBtn.addEventListener('click', ()=>{
+    setState({ ediPlannerOpen:true, ediPlan:{ pn: it.pn, qty: new Array(it.weeklyNeed.length).fill(0) } });
+    const el = document.getElementById('ediPlanner'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+  const closeBtn = document.getElementById('btnEdiClose');
+  if(closeBtn) closeBtn.addEventListener('click', ()=> setState({ ediPlannerOpen:false, ediPlan:null }));
+  const clearBtn = document.getElementById('btnEdiClear');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{
+    state.ediPlan.qty = new Array(it.weeklyNeed.length).fill(0);
+    document.querySelectorAll('[data-edi-input]').forEach(inp=>{ inp.value=''; });
+    refreshEdiPlanner(it);
+  });
+  const genBtn = document.getElementById('btnEdiGenerate');
+  if(genBtn) genBtn.addEventListener('click', ()=>{
+    const plan = computeMinPlan(it, niceUnitFor(it));
+    state.ediPlan.qty = plan;
+    document.querySelectorAll('[data-edi-input]').forEach(inp=>{ const j=parseInt(inp.dataset.ediInput,10); inp.value = plan[j]>0 ? plan[j] : ''; });
+    refreshEdiPlanner(it);
+  });
+  const expBtn = document.getElementById('btnEdiExport');
+  if(expBtn) expBtn.addEventListener('click', ()=>{
+    const weeks = getEdiWeeks(it);
+    const rows = [['PN',t('eexp_week'),t('eexp_label'),t('eexp_qty'),t('eexp_arr')]];
+    weeks.forEach(w=>{ const q = state.ediPlan.qty[w.j]||0; if(q>0) rows.push([it.pn, w.date, w.label, Math.round(q), plantArrivalDate(w.landIdx)]); });
+    if(rows.length===1) rows.push([it.pn,'','',t('eexp_none'),'']);
+    downloadCSV(`edi_plan_${it.pn}_${new Date().toISOString().slice(0,10)}.csv`, rows);
+  });
+  document.querySelectorAll('[data-edi-input]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const j = parseInt(inp.dataset.ediInput,10);
+      const v = parseFloat(e.target.value);
+      state.ediPlan.qty[j] = isNaN(v)||v<0 ? 0 : v;
+      refreshEdiPlanner(it);
+    });
+    inp.addEventListener('keydown', e=>{ e.stopPropagation(); });
+  });
+}
+
+/* ---------------------------- EVENT WIRING ---------------------------- */
+function attachHandlers(){
+  // language switcher (present on every screen)
+  document.querySelectorAll('[data-lang]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(LANG !== el.dataset.lang){ LANG = el.dataset.lang; document.documentElement.lang = LANG; render(); }
+    });
+  });
+
+  // upload screen
+  const dz = document.getElementById('dropzone');
+  if(dz){
+    const input = document.getElementById('fileInput');
+    input.addEventListener('change', e => handleFiles(e.target.files));
+    ['dragover','dragenter'].forEach(evt => dz.addEventListener(evt, e=>{ e.preventDefault(); dz.classList.add('drag'); }));
+    ['dragleave','drop'].forEach(evt => dz.addEventListener(evt, e=>{ e.preventDefault(); dz.classList.remove('drag'); }));
+    dz.addEventListener('drop', e => { if(e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
+  }
+  const btnContinue = document.getElementById('btnContinue');
+  if(btnContinue) btnContinue.addEventListener('click', proceedFromUpload);
+  const btnDemo = document.getElementById('btnDemo');
+  if(btnDemo) btnDemo.addEventListener('click', loadDemo);
+
+  // user select screen
+  document.querySelectorAll('[data-owner]').forEach(btn=>{
+    btn.addEventListener('click', ()=> setState({ screen:'dashboard', currentOwner: btn.dataset.owner, scope:'mine' }));
+  });
+  const btnTeam = document.getElementById('btnTeamView');
+  if(btnTeam) btnTeam.addEventListener('click', ()=> setState({ screen:'dashboard', currentOwner:null, scope:'team' }));
+
+  // dashboard: topbar
+  const btnUserMenu = document.getElementById('btnUserMenu');
+  if(btnUserMenu) btnUserMenu.addEventListener('click', (e)=>{ e.stopPropagation(); setState({ userMenuOpen: !state.userMenuOpen, settingsOpen:false }); });
+  document.querySelectorAll('[data-switch-owner]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const v = btn.dataset.switchOwner;
+      if(v==='__team__') setState({ currentOwner:null, scope:'team', userMenuOpen:false, drawerItem:null });
+      else setState({ currentOwner:v, scope:'mine', userMenuOpen:false, drawerItem:null });
+    });
+  });
+  const btnSettings = document.getElementById('btnSettings');
+  if(btnSettings) btnSettings.addEventListener('click', (e)=>{ e.stopPropagation(); setState({ settingsOpen: !state.settingsOpen, userMenuOpen:false }); });
+  const setSafety = document.getElementById('setSafety');
+  if(setSafety) setSafety.addEventListener('change', e=>{ SETTINGS.safetyDelayWeeks = parseFloat(e.target.value)||0; recomputeCategories(); render(); });
+  const setOverstock = document.getElementById('setOverstock');
+  if(setOverstock) setOverstock.addEventListener('change', e=>{ SETTINGS.overstockValueThreshold = parseFloat(e.target.value)||0; recomputeCategories(); render(); });
+  const setRuptureHorizon = document.getElementById('setRuptureHorizon');
+  if(setRuptureHorizon) setRuptureHorizon.addEventListener('change', e=>{ SETTINGS.ruptureHorizonWeeks = parseFloat(e.target.value)||12; recomputeCategories(); render(); });
+  const setDemandSpike = document.getElementById('setDemandSpike');
+  if(setDemandSpike) setDemandSpike.addEventListener('change', e=>{ SETTINGS.demandSpikeMultiplier = parseFloat(e.target.value)||2; recomputeCategories(); render(); });
+
+  const btnOverview = document.getElementById('btnOverview');
+  if(btnOverview) btnOverview.addEventListener('click', ()=> setState({ screen:'overview' }));
+  const btnBackToDash = document.getElementById('btnBackToDash');
+  if(btnBackToDash) btnBackToDash.addEventListener('click', ()=> setState({ screen:'dashboard' }));
+  document.querySelectorAll('[data-sort]').forEach(el=>{
+    el.addEventListener('click', ()=> setState({ overviewSort: el.dataset.sort }));
+  });
+  document.querySelectorAll('[data-goto-owner]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      setState({ screen:'dashboard', currentOwner: el.dataset.gotoOwner, scope:'mine', category:'RUPTURE', drawerItem:null });
+    });
+  });
+
+  const btnExport = document.getElementById('btnExport');
+  if(btnExport) btnExport.addEventListener('click', exportCurrentView);
+
+  // andon tiles (4 main categories) - click again on the active one to see everything
+  document.querySelectorAll('.andon-tile[data-category]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const cat = el.dataset.category;
+      setState({ category: state.category===cat ? 'ALL' : cat, drawerItem:null, infoOpen:null });
+    });
+  });
+  // secondary chips (Sans mouvement / Sans prévision)
+  document.querySelectorAll('.sec-chip[data-category]').forEach(el=>{
+    el.addEventListener('click', ()=> setState({ category: el.dataset.category, drawerItem:null, infoOpen:null }));
+  });
+  document.querySelectorAll('[data-info]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const cat = el.dataset.info;
+      setState({ infoOpen: state.infoOpen===cat ? null : cat });
+    });
+  });
+  document.querySelectorAll('.info-pop').forEach(el=>{
+    el.addEventListener('click', e=> e.stopPropagation());
+  });
+
+  // filter bar
+  const searchInput = document.getElementById('searchInput');
+  if(searchInput){
+    searchInput.addEventListener('input', e=>{ state.search = e.target.value; renderListOnly(); });
+    searchInput.focus();
+    searchInput.setSelectionRange(state.search.length, state.search.length);
+  }
+  const supplierSelect = document.getElementById('supplierSelect');
+  if(supplierSelect){
+    supplierSelect.addEventListener('change', e=>{ setState({ supplierFilter: e.target.value }); });
+  }
+  document.querySelectorAll('[data-family]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const f = el.dataset.family;
+      if(state.familyFilter.has(f)) state.familyFilter.delete(f); else state.familyFilter.add(f);
+      render();
+    });
+  });
+  document.querySelectorAll('[data-scope]').forEach(el=>{
+    el.addEventListener('click', ()=>{ if(!el.disabled) setState({ scope: el.dataset.scope }); });
+  });
+
+  // list rows -> drawer
+  document.querySelectorAll('[data-open]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const it = state.items.find(i=>i.pn===el.dataset.open);
+      setState({ drawerItem: it, ediPlannerOpen:false, ediPlan:null });
+    });
+  });
+  const drawerClose = document.getElementById('drawerClose');
+  if(drawerClose) drawerClose.addEventListener('click', ()=> setState({ drawerItem:null, ediPlannerOpen:false, ediPlan:null }));
+  const overlay = document.getElementById('drawerOverlay');
+  if(overlay) overlay.addEventListener('click', ()=> setState({ drawerItem:null, ediPlannerOpen:false, ediPlan:null }));
+
+  bindCopyButtons();
+  bindEdiPlanner();
+
+  // click-away for popovers
+  document.addEventListener('click', closePopovers, { once:true });
+}
+
+function closePopovers(){
+  if(state.userMenuOpen || state.settingsOpen || state.infoOpen){ state.userMenuOpen=false; state.settingsOpen=false; state.infoOpen=null; render(); }
+}
+
+function bindCopyButtons(){
+  document.querySelectorAll('[data-copy-pn]').forEach(el=>{
+    el.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const pn = el.dataset.copyPn;
+      const reset = () => { el.classList.remove('copied'); el.innerHTML = ICONS.copy; };
+      const showCopied = () => {
+        el.classList.add('copied'); el.innerHTML = ICONS.check;
+        setTimeout(reset, 1200);
+      };
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(pn).then(showCopied).catch(()=>{
+          const ta = document.createElement('textarea');
+          ta.value = pn; document.body.appendChild(ta); ta.select();
+          try{ document.execCommand('copy'); showCopied(); } finally { document.body.removeChild(ta); }
+        });
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = pn; document.body.appendChild(ta); ta.select();
+        try{ document.execCommand('copy'); showCopied(); } finally { document.body.removeChild(ta); }
+      }
+    });
+  });
+}
+
+function renderListOnly(){
+  const wrap = document.querySelector('.list-wrap');
+  if(wrap) wrap.outerHTML = renderList();
+  document.querySelectorAll('[data-open]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const it = state.items.find(i=>i.pn===el.dataset.open);
+      setState({ drawerItem: it, ediPlannerOpen:false, ediPlan:null });
+    });
+  });
+  bindCopyButtons();
+}
+
+function exportCurrentView(){
+  const items = getFilteredItems();
+  const header = ['PN',t('i_owner'),t('exp_projects'),t('col_supplier'),t('k_stock'),t('k_need'),t('i_cat'),t('exp_w_rupture'),t('exp_w_t'),t('exp_w_d'),t('exp_cover'),t('exp_value')];
+  const rows = [header].concat(items.map(it=>[
+    it.pn, ownerLabel(it.owner), it.families.map(famLabel).join(' / '), it.supplier, Math.round(it.current), Math.round(it.avg),
+    t('cat_'+it.category), it.weeksToRupture ?? '', it.weeksToUnderSafetyTransport ?? '', it.weeksToUnderSafetyDemand ?? '',
+    it.coverageNow===Infinity?'∞':Math.round(it.coverageNow*10)/10, Math.round(it.overstockValue||0),
+  ]));
+  downloadCSV(`andon_${state.category.toLowerCase()}_${new Date().toISOString().slice(0,10)}.csv`, rows);
+}
+
+/* ---------------------------- BOOT ----------------------------
+   URL options: ?lang=fr|en|it sets the interface language, ?demo loads the synthetic sample at once
+   (e.g. https://<user>.github.io/<repo>/?demo&lang=en). */
+(function boot(){
+  const q = new URLSearchParams(location.search);
+  const lang = (q.get('lang')||'').toLowerCase();
+  if(I18N[lang]){ LANG = lang; document.documentElement.lang = LANG; }
+  render();
+  if(q.has('demo')) loadDemo();
+})();
+</script>
+</body>
+</html>
